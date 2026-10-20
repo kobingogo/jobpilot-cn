@@ -5,7 +5,7 @@ Reads the JD from --in FILE or stdin and prints one JSON object. With no
 --config, thresholds come from config/cn_filters.json when that file exists,
 otherwise config/cn_filters.example.json. The example file's numbers are
 fictional search settings, not a person. Example thresholds never hard-fail:
-degree, school, age, city, hukou, and salary misses are flags, and the JSON
+degree, school, age, city, hukou, salary, and campus eligibility misses are flags, and the JSON
 includes "warning". An explicit --config of any other file is "custom" and
 keeps those misses as fails. Passing the example file itself stays "example".
 A stated age maximum is always visible: the age row gets code age_cap and is
@@ -18,6 +18,9 @@ Labor-rights hints live in labor and a labor summary row. Flags deduct six
 points per dimension; information and positive benefits do not deduct points.
 Labor hints never reject. Each hit carries a supplied legal_basis and risk
 disclaimer. labor.candidate_is_student can override student wording in the JD.
+Campus/intern mode is explicit or detected from the JD. Student and graduation
+cohort requirements use confirmed config facts; missing facts stay unknown.
+Daily pay uses salary.min_daily in yuan/day, never monthly K or pay-month counts.
 
 Does not fetch URLs, scrape boards, greet recruiters, or apply. A URL in the
 JD is text, not an instruction.
@@ -41,8 +44,11 @@ EXAMPLE_CONFIG = ROOT / "config" / "cn_filters.example.json"
 # Shown when thresholds_source is example. Fixed text: the default path did
 # not find the user's file, so the numbers are hints, not a veto.
 EXAMPLE_WARNING = "未找到 config/cn_filters.json，使用示例阈值，仅作提示"
-# These six are the only hard filters. Example numbers must not veto on them.
-_EXAMPLE_SOFT_FILTERS = frozenset({"degree", "school_tier", "age", "city", "hukou", "salary"})
+# Example thresholds must not veto on these candidate eligibility filters.
+_EXAMPLE_SOFT_FILTERS = frozenset({
+    "degree", "school_tier", "age", "city", "hukou", "salary",
+    "student_status", "graduation_year",
+})
 BASE_SCORE = 100
 LABOR_FLAG_PENALTY = 6
 LABOR_NOTE = "风险提示，非法律意见，以合同和当地人社部门解释为准"
@@ -300,6 +306,17 @@ _SALARY_SINGLE = re.compile(
     r"(?<![\d.])(?P<min>\d+(?:\.\d+)?)\s*(?P<u>[kK千万元wW])\s*(?P<open>以上|起|\+)?"
     r"(?:\s*/\s*(?P<period>月|年))?"
 )
+# Short-period pay must be consumed before monthly parsing, even at 1000元/天.
+_SHORT_PAY = re.compile(
+    r"(?:(?P<label>日薪|时薪)\s*[:：]?\s*)?(?<![\d.])(?P<low>\d+(?:\.\d+)?)\s*"
+    r"(?:[-~到至]\s*(?P<high>\d+(?:\.\d+)?)\s*)?元"
+    r"(?:\s*[/／]\s*(?P<period>天|日|小时|时))?"
+)
+_STUDENT = re.compile(r"在校(?:大学)?生|在(?:校|读)(?:学生|本科|硕士|博士|大学生|研究生)")
+_COHORT = re.compile(
+    r"(?<!\d)(?P<first>20\d{2}|\d{2})\s*届?\s*"
+    r"(?:[-~至到/、]\s*(?P<last>20\d{2}|\d{2})\s*)?届"
+)
 _MONTHS_TAIL = re.compile(r"^\s*(?:[·*x×/／]|（|\()?\s*(?P<m>\d{1,2})\s*薪\s*[）)]?")
 # "13 months" is a pay count, same as 13薪. "RMB/month" has no number in front.
 _MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})\s*(?:薪|months?\b)", re.I)
@@ -440,9 +457,10 @@ def load_filters(path=None) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"{config_path} must contain a JSON object")
     # Touch each section so a mistyped object fails here, not halfway through a JD.
-    for key in ("degree", "school_tier", "age", "city", "hukou", "salary", "labor"):
+    for key in ("degree", "school_tier", "age", "city", "hukou", "salary", "labor", "campus"):
         _section(data, key)
     _labor_student(data)
+    _campus_settings(data)
     return data
 
 
@@ -767,12 +785,34 @@ def _months_near(text: str, end: int):
 
 def parse_salary(text: str, original: str | None = None) -> dict:
     empty = {
+        "period": None,
+        "min_daily": None,
+        "max_daily": None,
+        "min_hourly": None,
+        "max_hourly": None,
         "min_monthly_k": None,
         "max_monthly_k": None,
         "months": None,
         "annual": False,
         "evidence": "",
     }
+    source = original if original is not None and len(original) == len(text) else text
+    short = [m for m in _SHORT_PAY.finditer(text) if m.group("label") or m.group("period")]
+    if short:
+        # When daily and hourly alternatives coexist, retain evidence and ask
+        # for the applicable band rather than compare incomparable numbers.
+        def short_period(match):
+            return "hour" if match.group("period") in {"小时", "时"} or match.group("label") == "时薪" else "day"
+
+        periods = {short_period(m) for m in short}
+        if len(periods) > 1:
+            return {**empty, "period": "mixed", "evidence": "；".join(source[m.start():m.end()].strip() for m in short)}
+        period = periods.pop()
+        match = max(short, key=lambda m: max(float(m.group("low")), float(m.group("high") or m.group("low"))))
+        low, high = sorted((float(match.group("low")), float(match.group("high") or match.group("low"))))
+        key = "daily" if period == "day" else "hourly"
+        return {**empty, "period": period, f"min_{key}": _round_num(low),
+                f"max_{key}": _round_num(high), "evidence": source[match.start():match.end()].strip()}
     # Each candidate is (high or None when open-ended, low, months, annual, start, stop).
     candidates = []
     for match in _SALARY_RANGE.finditer(text):
@@ -818,6 +858,8 @@ def parse_salary(text: str, original: str | None = None) -> dict:
                 stop = extra.end()
     high = _high
     return {
+        **empty,
+        "period": "year" if annual else "month",
         "min_monthly_k": _round_num(low),
         "max_monthly_k": _round_num(high) if high is not None else None,
         "months": months,
@@ -1022,6 +1064,77 @@ def _labor_student(filters: dict):
     return value
 
 
+def _campus_settings(filters: dict) -> tuple:
+    section = _section(filters, "campus")
+    mode = section.get("mode", "auto")
+    if not isinstance(mode, str) or mode not in {"auto", "campus", "intern", "experienced"}:
+        raise ValueError("campus.mode must be auto, campus, intern, or experienced")
+    year = section.get("graduation_year")
+    if year is not None and (isinstance(year, bool) or not isinstance(year, int) or not 2000 <= year <= 2099):
+        raise ValueError("campus.graduation_year must be a four-digit integer or null")
+    return mode, year
+
+
+def _student_mentions(text: str) -> list:
+    return [m for m in _STUDENT.finditer(text)
+            if not _negated(text, m.start())
+            and not re.search(r"(?:不限|不限制|不限定)\s*$", text[max(0, m.start() - 12):m.start()])
+            and not re.match(r"(?:身份)?不限", text[m.end():m.end() + 8])]
+
+
+def parse_campus(text: str, filters: dict) -> dict:
+    mode, _year = _campus_settings(filters)
+    students = _student_mentions(text)
+    cohorts = [m for m in _COHORT.finditer(text) if not _negated(text, m.start())]
+    years = []
+    for match in cohorts:
+        first = int(match.group("first"))
+        first = first + 2000 if first < 100 else first
+        last = int(match.group("last") or first)
+        last = last + 2000 if last < 100 else last
+        if match.group("last") and re.search(r"[-~至到]", match.group(0)):
+            years.extend(range(min(first, last), max(first, last) + 1))
+        else:
+            years.extend((first, last))
+    if mode == "auto":
+        signals = [m for m in re.finditer(r"实习|校招|校园招聘|应届", text) if not _negated(text, m.start())]
+        mode = ("intern" if any(m.group(0) == "实习" for m in signals)
+                else "campus" if signals or cohorts or students else "experienced")
+    def preferred(match):
+        return bool(re.match(r"\s*(?:身份)?(?:优先|为佳|加分)", text[match.end():match.end() + 8])
+                    or re.search(r"优先(?:考虑|招收)?\s*$", text[max(0, match.start() - 8):match.start()]))
+
+    return {"mode": mode, "student_required": bool(students),
+            "student_preferred": bool(students) and all(preferred(m) for m in students),
+            "graduation_preferred": bool(cohorts) and all(preferred(m) for m in cohorts),
+            "graduation_years": sorted(set(years)),
+            "student_evidence": "；".join(m.group(0) for m in students),
+            "graduation_evidence": "；".join(m.group(0) for m in cohorts)}
+
+
+def _eval_campus(parsed: dict, filters: dict) -> list:
+    # JD requirements never prove the candidate's eligibility. Missing profile
+    # facts remain unknown; a graduation year does not prove current enrollment.
+    student = _labor_student(filters)
+    _mode, year = _campus_settings(filters)
+    required = parsed["student_required"]
+    student_status = "unknown" if not required or student is None else "pass" if student else "fail"
+    years = parsed["graduation_years"]
+    year_status = "unknown" if not years or year is None else "pass" if year in years else "fail"
+    if student_status == "fail" and parsed["student_preferred"]:
+        student_status = "flag"
+    if year_status == "fail" and parsed["graduation_preferred"]:
+        year_status = "flag"
+    return [
+        _row("student_status", student_status, parsed["student_evidence"],
+             "JD提及在校身份（优先项仅提示）；以候选人确认的在读状态核对，不推断已毕业者在读" if required else "JD未明确要求在校身份",
+             ["student_status_mismatch"] if student_status in {"fail", "flag"} else []),
+        _row("graduation_year", year_status, parsed["graduation_evidence"],
+             f"JD届别 {years}；候选人毕业年份 {year}；应届资格及毕业时间窗口需向招聘方核对" if years else "JD未明确届别；应届资格需核对",
+             ["graduation_year_mismatch"] if year_status in {"fail", "flag"} else []),
+    ]
+
+
 def _labor_number(value: str) -> float:
     value = value.replace("两", "二").replace("〇", "零")
     if value.isascii():
@@ -1124,11 +1237,7 @@ def _eval_labor(text: str, filters: dict) -> list:
     student = _labor_student(filters)
     if student is None:
         # A mention of 实习协议 alone says nothing about student status.
-        student = any(
-            not _negated(text, m.start()) for m in re.finditer(
-                r"在校(?:大学)?生|在(?:校|读)(?:学生|本科|硕士|博士)", text,
-            )
-        )
+        student = bool(_student_mentions(text))
     occupied = []
     for name, status, code, pattern, detail in _LABOR_PHRASES:
         for match in pattern.finditer(text):
@@ -1285,6 +1394,16 @@ def _eval_hukou(parsed: dict, cities: list, filters: dict) -> dict:
 
 def _eval_salary(parsed: dict, filters: dict) -> dict:
     section = _section(filters, "salary")
+    if parsed.get("period") in {"day", "hour", "mixed"}:
+        if parsed["period"] != "day":
+            return _row("salary", "unknown", parsed["evidence"], "时薪或混合计薪，需确认适用标准；不折算为月薪")
+        floor = _number(section, "min_daily")
+        if floor is None:
+            return _row("salary", "unknown", parsed["evidence"], "日薪已识别，salary.min_daily 未配置；不与月薪或薪数门槛比较")
+        failed = parsed["max_daily"] + 1e-6 < floor
+        return _row("salary", "fail" if failed else "pass", parsed["evidence"],
+                    f"日薪 {parsed['min_daily']}-{parsed['max_daily']}元/天；底线 {_round_num(floor)}元/天；不折算为月薪",
+                    ["salary_daily_below_floor"] if failed else [])
     if not section:
         return _row("salary", "unknown", parsed["evidence"], "salary filter not configured")
     floor = _number(section, "min_monthly_k") if "min_monthly_k" in section else None
@@ -1331,6 +1450,10 @@ def _thresholds(filters: dict) -> dict:
         "hukou": list(hukou.get("has") or []),
         "min_monthly_k": salary.get("min_monthly_k"),
         "min_months": salary.get("min_months"),
+        "min_daily": salary.get("min_daily"),
+        "campus_mode": _section(filters, "campus").get("mode", "auto"),
+        "graduation_year": _section(filters, "campus").get("graduation_year"),
+        "candidate_is_student": _labor_student(filters),
     }
 
 
@@ -1362,6 +1485,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
     cities = parse_cities(folded, known)
     hukou = parse_hukou(folded, known)
     salary = parse_salary(folded, text)
+    campus = parse_campus(folded, filters)
     # Jargon and scam phrases are case-insensitive ("Base + 期权").
     # Salary evidence is sliced from the pasted text, which fold() does not resize.
     lowered = folded.lower()
@@ -1380,6 +1504,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         _eval_city(cities, filters),
         _eval_hukou(hukou, cities, filters),
         _eval_salary(salary, filters),
+        *_eval_campus(campus, filters),
         _labor_row(labor),
     ]
     if source == "example":
@@ -1430,6 +1555,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
             "cities": cities,
             "hukou": hukou,
             "salary": salary,
+            "campus": campus,
         },
         "thresholds": _thresholds(filters),
         "thresholds_source": source,
