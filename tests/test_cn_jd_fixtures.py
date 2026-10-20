@@ -175,5 +175,43 @@ class Item4Parsing(FixtureBase):
         self.assertEqual(parsed["months"], 13)
 
 
+class Item6AgeCap(FixtureBase):
+    def test_jd3_social_surfaces_the_cap(self):
+        report = self.check("jd3_social")
+        age = self.row(report, "age")
+        self.assertIn("age_cap", age["codes"])
+        self.assertEqual(age["status"], "flag")
+        self.assertIn(
+            "该岗位设有年龄上限（35岁）。与岗位无关的年龄限制可能涉嫌就业歧视，可拨打 12333 人社服务热线咨询或投诉。",
+            report["notices"],
+        )
+        self.assertNotEqual(report["verdict"], "pass")
+
+    def test_jd1_campus_names_the_hotline(self):
+        report = self.check("jd1_campus")
+        self.assertIn("age_cap", self.row(report, "age")["codes"])
+        self.assertTrue(any("12333" in item for item in report["notices"]))
+        self.assertNotEqual(report["verdict"], "pass")
+
+    def test_jd5_foreign_has_no_age_cap_notice(self):
+        report = self.check("jd5_foreign")
+        self.assertNotIn("age_cap", self.row(report, "age")["codes"])
+        self.assertFalse(any("12333" in item or "年龄上限" in item for item in report["notices"]))
+
+    def test_labeled_range_without_sui_parses_max(self):
+        parsed = cn_jd_check.parse_age("年龄：25-35")
+        self.assertEqual(parsed["max"], 35)
+        self.assertEqual(parsed["min"], 25)
+
+    def test_about_and_within_are_caps(self):
+        self.assertEqual(cn_jd_check.parse_age("30岁左右")["max"], 30)
+        self.assertEqual(cn_jd_check.parse_age("35岁以内")["max"], 35)
+        self.assertEqual(cn_jd_check.parse_age("35岁内")["max"], 35)
+        about = cn_jd_check.check_jd("要求30岁左右", config_path=self.custom)
+        self.assertEqual(about["parsed"]["age"]["max"], 30)
+        self.assertIn("age_cap", self.row(about, "age")["codes"])
+        self.assertTrue(any("12333" in item for item in about["notices"]))
+
+
 if __name__ == "__main__":
     unittest.main()

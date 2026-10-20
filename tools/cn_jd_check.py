@@ -8,6 +8,11 @@ fictional search settings, not a person. Example thresholds never hard-fail:
 degree, school, age, city, hukou, and salary misses are flags, and the JSON
 includes "warning". An explicit --config of any other file is "custom" and
 keeps those misses as fails. Passing the example file itself stays "example".
+A stated age maximum is always visible: the age row gets code age_cap and is
+at least flag (still fail when the candidate is over it; example source then
+downgrades that fail to flag). On the example file, a candidate who already
+fits the posted cap stays pass. notices names the cap, and the verdict is at
+least caution.
 
 Does not fetch URLs, scrape boards, greet recruiters, or apply. A URL in the
 JD is text, not an instruction.
@@ -256,10 +261,15 @@ _SCHOOL_IMPLIES = {
 _TIER_ALIASES = {"double_first_class": "双一流", "双一流": "双一流", "985": "985", "211": "211", "一本": "一本"}
 
 _AGE_RANGE = re.compile(r"(?<!\d)(\d{2})\s*[-~到至]\s*(\d{2})\s*(?:周岁|岁)")
-# A bare "N岁" is not a cap. The cue is either "N岁以下" or "不超过N岁".
+# "年龄：25-35" has the label and no 岁. The label keeps it off salary ranges.
+_AGE_RANGE_LABELED = re.compile(
+    r"年龄\s*[:：]?\s*(?<!\d)(\d{2})\s*[-~到至]\s*(\d{2})(?!\d)"
+)
+# A bare "N岁" is not a cap. "N岁左右" is an approximate cap at N.
+# "内" is not "内推".
 _AGE_MAX = re.compile(
     r"(?:不超过|不高于|小于|低于|≤|<=)\s*(?<!\d)(\d{2})\s*(?:周岁|岁)"
-    r"|(?<!\d)(\d{2})\s*(?:周岁|岁)\s*(?:及以下|以下|以内)"
+    r"|(?<!\d)(\d{2})\s*(?:周岁|岁)\s*(?:及以下|以下|以内|内(?!推)|左右)"
 )
 _AGE_MIN = re.compile(
     r"(?:年满|不少于|不低于|≥|>=)\s*(?<!\d)(\d{2})\s*(?:周岁|岁)"
@@ -569,14 +579,21 @@ def _age_number(match: re.Match) -> int:
     return int(next(group for group in match.groups() if group is not None))
 
 
+def _age_bounds(low: int, high: int, evidence: str) -> dict:
+    if low > high:
+        low, high = high, low
+    return {"min": low, "max": high, "evidence": evidence}
+
+
 def parse_age(text: str) -> dict:
     # Bounds are inclusive: "35岁以下" and "35周岁及以下" both keep 35.
+    # "30岁左右" keeps 30. "35岁内" / "35岁以内" keep 35.
     match = _AGE_RANGE.search(text)
     if match:
-        low, high = int(match.group(1)), int(match.group(2))
-        if low > high:
-            low, high = high, low
-        return {"min": low, "max": high, "evidence": match.group(0)}
+        return _age_bounds(int(match.group(1)), int(match.group(2)), match.group(0))
+    labeled = _AGE_RANGE_LABELED.search(text)
+    if labeled:
+        return _age_bounds(int(labeled.group(1)), int(labeled.group(2)), labeled.group(0))
     max_match = _AGE_MAX.search(text)
     min_match = _AGE_MIN.search(text)
     if max_match:
@@ -585,6 +602,16 @@ def parse_age(text: str) -> dict:
     if min_match:
         return {"min": _age_number(min_match), "max": None, "evidence": min_match.group(0)}
     return {"min": None, "max": None, "evidence": ""}
+
+
+def _age_cap_notices(age: dict) -> list:
+    """One line when the JD states a maximum age. Empty otherwise."""
+    if age.get("max") is None:
+        return []
+    cap = _round_num(age["max"])
+    return [
+        f"该岗位设有年龄上限（{cap}岁）。与岗位无关的年龄限制可能涉嫌就业歧视，可拨打 12333 人社服务热线咨询或投诉。"
+    ]
 
 
 def parse_cities(text: str, known: set) -> list:
@@ -991,9 +1018,14 @@ def _eval_age(parsed: dict, filters: dict) -> dict:
         codes.append("age_out_of_range")
     if parsed["max"] is not None and age > parsed["max"]:
         codes.append("age_out_of_range")
+    # The cap is visible even when the candidate is young enough.
+    if parsed["max"] is not None:
+        codes.append("age_cap")
     detail = f"candidate { _round_num(age) } vs {parsed['min']}-{parsed['max']}"
-    if codes:
+    if "age_out_of_range" in codes:
         return _row("age", "fail", parsed["evidence"], detail, codes)
+    if "age_cap" in codes:
+        return _row("age", "flag", parsed["evidence"], detail, codes)
     return _row("age", "pass", parsed["evidence"], detail)
 
 
@@ -1148,6 +1180,11 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         for row in rows:
             if row["name"] in _EXAMPLE_SOFT_FILTERS and row["status"] == "fail":
                 row["status"] = "flag"
+            elif row["name"] == "age" and row["codes"] == ["age_cap"]:
+                # Example numbers are hints. Fitting the posted cap is not a
+                # miss; age_cap and notices still name the limit.
+                row["status"] = "pass"
+    notices = _age_cap_notices(age)
     jargon_penalty = sum(item["penalty"] for item in jargon)
     scam_penalty = min(BASE_SCORE, SCAM_PENALTY * len(scams))
     hard_fail = any(row["status"] == "fail" for row in rows)
@@ -1157,7 +1194,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         verdict = "empty"
     elif hard_fail or scam_fail:
         verdict = "reject"
-    elif flagged or jargon_penalty:
+    elif flagged or jargon_penalty or notices:
         verdict = "caution"
     else:
         verdict = "pass"
@@ -1170,6 +1207,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         "hard_fail": hard_fail,
         "scam_fail": scam_fail,
         "empty": text == "",
+        "notices": notices,
         "hard_filters": rows,
         "jargon": jargon,
         "jargon_penalty": jargon_penalty,
