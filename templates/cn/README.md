@@ -39,7 +39,7 @@ cd cv && rm -f main_<company>_<role>.pdf && mkdir -p build && TEXINPUTS=../templ
 
 档案里的 CV language 是「中文」（或 `Chinese` / `zh`），并且没有用 `/add-template` 登记别的模板时，`/apply` 用这份骨架，而不是 moderncv 的两页简历。用户当次明确要求一页中文简历时同样使用。已经激活的自定义模板优先。求职信仍走原来的 `cover.cls`，语言跟手贴的职位描述走。
 
-一页能放下的大概是：简介两三行，技能三四行，最近一份工作三条，前一份两条，一个项目两条，教育一行。溢到第二页就删内容，不要把字号降到五号以下，也不要把页边距压到 12mm 以下。校招可以把教育放在工作经历前面。
+一页能放下的大概是：简介两三行，技能三四行，最近一份工作三条，前一份两条，一个项目两条，教育一行。溢到第二页就删内容，不要把字号降到五号以下，也不要把页边距压到 12mm 以下。校招/实习使用 [campus/resume.tex](campus/resume.tex)（[说明与虚构示例](campus/README.md)），教育优先，无需现职雇主。`Career stage: campus / intern` 由 `/setup` 记录，`/apply` 据此选中，仍为 xelatex、单栏、1 页。
 
 ## 打招呼和申请附言
 

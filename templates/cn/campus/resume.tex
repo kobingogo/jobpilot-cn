@@ -1,0 +1,48 @@
+%% 校招/实习一页骨架。占位符不是真人；只填候选人确认的事实。
+%% xelatex / ctexart / xeCJK，复用上一级 cnresume.sty。
+%% 从本目录编译：TEXINPUTS=.:..//: xelatex -halt-on-error resume.tex
+%% 复制到 cv/ 后沿用 templates/cn/README.md 的编译命令。
+\documentclass[a4paper,fontset=none,zihao=5]{ctexart}
+\usepackage{cnresume}
+% 照片默认关闭。仅经本人要求时启用：
+% \cnphoto{photo.jpg}
+\hypersetup{pdftitle={校招实习简历},pdfauthor={姓名},pdfsubject={Resume}}
+\begin{document}
+\cnheader{[姓名]}{[校招或实习意向] · [城市] · [可到岗时间]}{%
+  [电话]\quad\href{mailto:[邮箱]}{[邮箱]}%
+}
+\cnsection{教育背景}
+\cnedu{[入学]-[预计毕业]}{[专业、在读或已获学位]}{[学校]}{[城市]}
+\cnprofile{[毕业届别；可选：真实 GPA/满分、排名/总人数、相关课程。未提供则删除。]}
+
+\cnsection{实习经历}
+% 无实习时删除本节；不能把课程项目改成任职经历。
+\cnrole{[开始]-[结束]}{[实习岗位]}{[实习单位]}{[城市]}
+\begin{itemize}
+  \item {[具体任务、个人贡献和可核对结果；没有指标不编数字。]}
+  \item {[使用的工具、验证方式与复盘。]}
+\end{itemize}
+
+\cnsection{项目经历}
+\cnproject{[项目名称]}{[开始]-[结束]}{[课程、个人或团队项目；个人角色]}
+\begin{itemize}
+  \item {[问题、方案、自己完成的部分。]}
+  \item {[验证结果、局限和下一步；注明测试环境。]}
+\end{itemize}
+\cnproject{[项目名称]}{[开始]-[结束]}{[背景与个人角色]}
+\begin{itemize}
+  \item {[一项可解释的贡献。]}
+\end{itemize}
+
+\cnsection{在校经历 / 竞赛 / 奖学金}
+\cnproject{[在校经历或竞赛]}{[时间]}{[组织、角色或主办方；可选，无则删除]}
+\begin{itemize}
+  \item {[个人分工、协作过程、奖项级别；团队奖注明团队及本人贡献。]}
+\end{itemize}
+\cnprofile{[奖学金名称、授予单位与时间；可选，无则删除。]}
+
+\cnsection{专业技能}
+\cnskill{技术：}{[能在面试中解释和演示的技能]}
+\cnskill{语言：}{[语言与真实水平]}
+\cnskill{实习安排：}{[每周到岗天数、持续月数；仅实习填写]}
+\end{document}
