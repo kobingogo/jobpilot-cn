@@ -1,5 +1,5 @@
 ---
-framework_version: 1.4.9
+framework_version: 1.4.10
 ---
 
 # CV Templates and Tailoring Guide
@@ -33,6 +33,7 @@ Not the default. `/apply` selects it only when no `ACTIVE-TEMPLATE` block is act
 - **`templates/cn/example.tex` is 虚构.** Layout only. Not a person, not a fact source. Do not copy its employers, dates, or numbers.
 - **Dates** in the date argument use one ASCII hyphen (`2022.04-2026.03`), the same rule as "Date fields must be ASCII ranges" below.
 - **Section headings** stay in Chinese. JDs are pasted by hand. This template does not fetch a job site and does not submit or greet anyone.
+- **Outreach drafts** live in `templates/cn/outreach.md` (Boss直聘 打招呼, 2 or 3 sentences; 智联/猎聘 申请附言, one short paragraph). `/apply` fills them from the profile when this résumé is selected or the user names those boards. The user copies and sends. Nothing in this folder fetches a job site or submits an application. The 虚构 example in that file is not a fact source.
 - **Layout check:** `verify_layout.py`'s 90pt footer band is calibrated for moderncv. A full one-page résumé can report a false footer collision. Do not widen the bottom margin or cut content to silence that one report. `--pages 1` plus a visual read are the checks. A hole over 100pt is still real.
 
 Grounding, relevance-weighted cutting, keyword honesty, in-progress credentials, and the special-character escapes later in this file still apply. The 2-page moderncv budget does not.

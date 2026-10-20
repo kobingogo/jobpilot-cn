@@ -96,7 +96,7 @@ automatically from your Languages table above - don't duplicate them here. -->
 ## Workflow for New Job Applications
 1. User provides a job posting (URL or text)
 2. **Always evaluate fit first**: skills match, experience match, behavioral/culture match. Present this assessment to the user before proceeding.
-3. If good fit: create targeted CV (`cv/main_<company>_<role>.tex`) and cover letter (`cover_letters/cover_<company>_<role>.tex`)
+3. If good fit: create targeted CV (`cv/main_<company>_<role>.tex`) and cover letter (`cover_letters/cover_<company>_<role>.tex`). When `/apply` Step 2 says so, also write the unsent Chinese outreach draft the user copies and sends manually
 4. **Verify both documents** (see Verification Checklist below)
 5. Prepare interview talking points based on the role requirements and your strengths
 
@@ -129,6 +129,7 @@ After creating or updating a CV or cover letter, re-read the generated file and 
 - [ ] Agentic coding / AI tooling references mention **Claude Code** by name
 - [ ] Cover letter is addressed to the correct person (or "Dear Hiring Manager" if unknown)
 - [ ] Cover letter fits approximately one page
+- [ ] When `documents/applications/<company>_<role>/outreach.md` was written, the Boss直聘 打招呼 is 2 or 3 sentences, the 智联/猎聘 申请附言 is one paragraph of at most 4 sentences, every claim is already in the profile, the 虚构 example was not copied, and neither text was sent
 - [ ] CV section headings (`\section{...}`) and the References boilerplate line match the CV's language, not left as the English template defaults (see `05-cv-templates.md`)
 
 ### Compiled PDF verification (MANDATORY - never skip)

@@ -2,7 +2,7 @@
 
 This folder holds user-registered templates (LaTeX, Typst, or any other toolchain with a declared compile command), managed by the `/add-template` command. The framework works out of the box with its stock templates (moderncv for CVs, `cover.cls` for cover letters).
 
-`templates/cn/` is the exception: a shipped one-page Chinese résumé (ctex / xeCJK, optional photo, example marked 虚构). It is not registered through `/add-template`. `/apply` selects it when the CV language is Chinese and no custom template is active. See `templates/cn/README.md`. The `cv/` and `cover_letters/` layout below is only for templates you register yourself.
+`templates/cn/` is the exception: a shipped one-page Chinese résumé (ctex / xeCJK, optional photo, example marked 虚构) and `outreach.md` (a Boss直聘 greeting of 2 or 3 sentences, plus a 智联/猎聘 application note). It is not registered through `/add-template`. `/apply` selects the résumé when the CV language is Chinese and no custom template is active, and writes the outreach draft for the user to copy and send. Nothing in the folder is sent automatically. See `templates/cn/README.md`. The `cv/` and `cover_letters/` layout below is only for templates you register yourself.
 
 ## Layout
 

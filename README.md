@@ -387,3 +387,5 @@ MIT
 本分支面向中国招聘平台：Boss直聘、智联、拉勾、猎聘。这里没有爬虫，也不会自动投递。职位描述（JD）由使用者手工粘贴，再进入匹配评估以及简历、求职信的撰写流程。
 
 一页中文简历在 `templates/cn/`（ctex / xeCJK，用 xelatex 编译，照片开关默认关闭）。`example.tex` 标明**虚构**，不是真人，不能当作事实来源。档案里的 CV language 为中文，且没有用 `/add-template` 激活别的模板时，`/apply` 用这份骨架起草，页数是 1 页，而不是 moderncv 的 2 页。模板本身不抓取招聘网站，也不自动打招呼或投递。
+
+`templates/cn/outreach.md` 是两段短讯：Boss直聘打招呼（2 到 3 句）和智联/猎聘申请附言。`/apply` 按档案填好，写到 `documents/applications/<company>_<role>/outreach.md`。使用者自己复制发送，命令不会打开网站，也不会自动打招呼或投递。追踪状态仍是 `drafted`。其中的林示意是**虚构**示例。
