@@ -9,12 +9,15 @@
 | 文件 | 作用 |
 |---|---|
 | `cnfonts.sty` | CV 与中文求职信共享字体选择（不改变求职信版式） |
+| `cncover.sty` | 中文求职信显式 A4，保留 cover.cls 页边距与拉丁字体 |
 | `cnresume.sty` | 版式。单栏，方便 ATS 按阅读顺序抽取文本 |
 | `resume.tex` | 骨架。方括号是占位符，复制后再填 |
 | `example.tex` | 虚构的填好示例，页眉和正文都标了「虚构」 |
 | `outreach.md` | Boss直聘 打招呼（2 到 3 句）和智联/猎聘申请附言。用户复制后自己发送 |
 
 照片**默认关闭**。需要时在导言区写 `\cnphoto{photo.jpg}`，图片跟源文件放在一起。不要提交图片（仓库忽略 `*.jpg` / `*.png`）。没打开开关就不会去找图片。
+
+第五轮保留当前字体：中文简历拉丁正文沿用 ctexart 的衬线字体，中文求职信正文与列表保留 Raleway 无衬线。中文字体继续走共享回退。中文求职信在 ctex、cnfonts 后加载 `\usepackage{../templates/cn/cncover}`，显式 A4；不要把 cnresume 的简历页边距带入求职信。完整导言区见 [求职信规范](../../.claude/skills/job-application-assistant/06-cover-letter-templates.md#chinese-cover-letters-中文求职信)，理由见 [第五轮决策](../../docs/cn/第五轮产品决策.md)。现有已生成文件须手工添加该包才会改变纸张；不批量改历史稿件。
 
 ## 编译
 

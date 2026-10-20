@@ -162,11 +162,14 @@ For a Chinese posting, keep `cover.cls` and its compile command, but add these l
 ```latex
 \usepackage[fontset=none]{ctex}
 \usepackage{../templates/cn/cnfonts}
+\usepackage{../templates/cn/cncover}
 ```
 
 Compile from `cover_letters/`, where the shared font path and `OpenFonts/` resolve. Do not load `cnresume.sty` here: its geometry and résumé macros do not belong in the letter. This applies even when the CV uses an active custom template; an active custom **cover** template follows its own verified CJK setup instead. XeLaTeX/fontspec alone does not render Chinese: a successful exit can still produce a blank letter. Check the `.log` for `Missing character`, then extract with `pdftotext -layout -enc UTF-8` and confirm the name, salutation and Chinese body survive. Fix the font setup and recompile if they do not.
 
 Use「您好：」when the addressee is unknown, or a confirmed name with「老师／招聘团队」as appropriate. Date and closing are Chinese; do not assume a current employer or current salary for students. Keep the same Latin body/bullet font wrapper and let xeCJK supply the Chinese font. Count Chinese prose by characters if a portal sets a 字数 limit; do not enforce the English 250–300 word budget by padding Chinese text.
+
+`cncover.sty` explicitly selects A4 while preserving the class's 2.3cm margins and existing Latin fonts (Raleway sans for body/bullets). Use it only for Chinese letters; leave `cover.cls` and other languages' paper defaults intact. Chinese CVs retain their current Latin serif body. After selecting A4, recheck one page and readable text; trim unsupported or less relevant content rather than shrinking margins or inventing experience. An active custom cover template keeps its verified layout.
 
 ### Non-English Cover Letters
 - Same template structure, just write content in the posting's language
