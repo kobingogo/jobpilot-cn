@@ -1,0 +1,26 @@
+{
+  "_comment": "Fictional search thresholds for tools/cn_jd_check.py. Not a real person: no name, phone, email, or ID. Edit a copy; do not put real personal data in this file.",
+  "degree": {
+    "candidate": "bachelor",
+    "reject_if_required_above": true
+  },
+  "school_tier": {
+    "candidate_tiers": [],
+    "reject_if_required": true
+  },
+  "age": {
+    "candidate": 28
+  },
+  "city": {
+    "accept": ["北京", "上海", "深圳", "杭州", "广州", "远程"],
+    "reject_unlisted": true
+  },
+  "hukou": {
+    "has": [],
+    "reject_if_required": true
+  },
+  "salary": {
+    "min_monthly_k": 20,
+    "min_months": 13
+  }
+}
