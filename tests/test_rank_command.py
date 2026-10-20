@@ -44,6 +44,32 @@ def _sections(text: str) -> dict[str, str]:
 
 
 class RankCommandSpec(unittest.TestCase):
+    def test_cn_jd_check_feeds_rank_and_apply_scores(self):
+        """Cleaned text goes through cn_jd_check. Hard-filter and scam flags block;
+        jargon penalties lower the score. The scorer can actually run the script."""
+        text = COMMAND.read_text(encoding="utf-8")
+        sections = _sections(text)
+        step2 = sections["Step 2: Batch-Fetch and Score"]
+        self.assertIn("cn_jd_check.py", step2)
+        for field in ("hard_fail", "scam_fail", "jargon_penalty", "scam_penalty"):
+            self.assertIn(f'"{field}"', step2)
+        step3 = sections["Step 3: Aggregate and Rank"]
+        self.assertIn("jargon_penalty", step3)
+        self.assertIn("hard_fail", step3)
+        self.assertIn("scam_fail", step3)
+        agent = (REPO / ".claude" / "agents" / "posting-scorer.md").read_text(encoding="utf-8")
+        self.assertIn("cn_jd_check.py", agent)
+        self.assertIn("does not fetch", agent)
+        apply = (REPO / ".claude" / "commands" / "apply.md").read_text(encoding="utf-8")
+        step1 = re.search(r"## Step 1: DRAFTER - Evaluate Fit(.*?)(?=## Step 2:)", apply, re.DOTALL).group(1)
+        self.assertIn("cn_jd_check.py", step1)
+        self.assertIn("jargon_penalty", step1)
+        self.assertIn("hard_fail", step1)
+        self.assertIn("scam_fail", step1)
+        settings = json.loads((REPO / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        for entry in ("Bash(python tools/cn_jd_check.py:*)", "Bash(python3 tools/cn_jd_check.py:*)"):
+            self.assertIn(entry, settings["permissions"]["allow"])
+
     def test_step2_dispatches_posting_scorer_and_returns_guard(self):
         """Scoring agents read untrusted postings, so they run as the shipped
         least-privilege `posting-scorer` definition (no Edit/Write), gate every

@@ -87,6 +87,11 @@ ALLOWED_PERMISSIONS = {
     # Reads a file or stdin, writes only to an explicit --out, never fetches.
     "Bash(python tools/posting_guard.py:*)",
     "Bash(python3 tools/posting_guard.py:*)",
+    # Local JD screen (/rank scorers, /apply Step 1). Reads a file or stdin,
+    # writes nothing, never fetches. Hard-filter fail and scam flags block the
+    # fit score; jargon penalties lower it.
+    "Bash(python tools/cn_jd_check.py:*)",
+    "Bash(python3 tools/cn_jd_check.py:*)",
 }
 
 # Rules that must stay in .claude/settings.json permissions.ask. An ask rule

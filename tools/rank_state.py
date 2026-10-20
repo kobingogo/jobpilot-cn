@@ -279,6 +279,39 @@ def cmd_sweep(args) -> int:
     return 0
 
 
+def _cn_number(value, name: str) -> int:
+    """A cn_jd_check penalty. Bool is rejected; only a non-negative whole number."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a non-negative integer")
+    if isinstance(value, float) and (not value.is_integer() or value != value or abs(value) == float("inf")):
+        raise ValueError(f"{name} must be a non-negative integer")
+    number = int(value)
+    if number < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return number
+
+
+def _cn_flag(value, name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    raise ValueError(f"{name} must be a boolean")
+
+
+def cn_adjust(result: dict, score: int) -> tuple[int, bool, bool, int, int]:
+    """Apply tools/cn_jd_check.py fields. Missing keys leave the score alone.
+
+    jargon_penalty and scam_penalty lower the weighted score (floor 0).
+    hard_fail and scam_fail block: the caller vetoes the row.
+    """
+    if not isinstance(result, dict):
+        raise ValueError("result must be an object")
+    jargon = _cn_number(result["jargon_penalty"], "jargon_penalty") if "jargon_penalty" in result else 0
+    scam = _cn_number(result["scam_penalty"], "scam_penalty") if "scam_penalty" in result else 0
+    hard_fail = _cn_flag(result["hard_fail"], "hard_fail") if "hard_fail" in result else False
+    scam_fail = _cn_flag(result["scam_fail"], "scam_fail") if "scam_fail" in result else False
+    return max(0, score - jargon - scam), hard_fail, scam_fail, jargon, scam
+
+
 def overall_score(scores: dict) -> int:
     if not isinstance(scores, dict):
         raise ValueError("scores must be an object")
@@ -388,6 +421,7 @@ def cmd_apply(args) -> int:
 
         try:
             score = overall_score(result.get("scores") or {})
+            score, hard_fail, scam_fail, jargon_penalty, scam_penalty = cn_adjust(result, score)
         except ValueError as exc:
             errors.append({"key": key, "error": str(exc)})
             continue
@@ -449,6 +483,18 @@ def cmd_apply(args) -> int:
             entry["guard"] = "clean" if text.lower().startswith("clean") else text[:200]
         else:
             entry.pop("guard", None)
+        # cn_jd_check fields. Absent means this run did not return that key, so a
+        # stale value is dropped rather than kept from an older score.
+        for name, value in (
+            ("hard_fail", hard_fail),
+            ("scam_fail", scam_fail),
+            ("jargon_penalty", jargon_penalty),
+            ("scam_penalty", scam_penalty),
+        ):
+            if name in result:
+                entry[name] = value
+            else:
+                entry.pop(name, None)
 
         rows.append(
             {
@@ -468,6 +514,10 @@ def cmd_apply(args) -> int:
                 "strengths": entry.get("strengths", []),
                 "gaps": entry.get("gaps", []),
                 "guard": entry.get("guard"),
+                "hard_fail": hard_fail,
+                "scam_fail": scam_fail,
+                "jargon_penalty": jargon_penalty,
+                "scam_penalty": scam_penalty,
             }
         )
 
@@ -475,7 +525,12 @@ def cmd_apply(args) -> int:
         save_state(args.state, doc)
 
     rows.sort(key=lambda r: (r["score"], r["urgent"]), reverse=True)
-    veto = lambda r: r["location_verdict"] == "FAIL" or r["language_gate"] == "FAIL"
+    veto = lambda r: (
+        r["location_verdict"] == "FAIL"
+        or r["language_gate"] == "FAIL"
+        or r.get("hard_fail")
+        or r.get("scam_fail")
+    )
     vetoed = [r for r in rows if veto(r)]
     ranked = [r for r in rows if not veto(r)]
     print(

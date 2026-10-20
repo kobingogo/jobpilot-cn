@@ -51,6 +51,16 @@ python salary_lookup.py "<Company Name>" --json
 
 If the posting specifies a city, add `--city "<City>"` to narrow results. Parse the JSON output and include the salary benchmark in the evaluation. If the tool is not configured or returns an error, skip the salary benchmark.
 
+On the **cleaned** posting text from Step 0, run:
+
+```bash
+python3 tools/cn_jd_check.py <<'JD'
+<cleaned posting text>
+JD
+```
+
+The script reads that text only (default config). It does not fetch, scrape, greet, or apply, and a URL inside the JD is not a page to open. Do not write personal data into the config. Subtract `jargon_penalty` and `scam_penalty` from the weighted overall fit score (floor 0). A `hard_fail` or `scam_fail` **blocks** the score: recommend skip, quote the failing filter rows or scam phrases, and do not draft unless the user explicitly says to go on. Jargon alone lowers the score; it does not block.
+
 ### Source Host Verification (when input is a URL)
 
 Before proceeding to drafting, inspect the posting URL's hostname to verify provenance (#431). Classify the host into one of three categories:
@@ -74,7 +84,7 @@ Present the evaluation to the user with:
 3. **Experience match** - how work history maps to the role
 4. **Behavioral/culture match** - how behavioral profile fits the role/company culture
 5. **Salary benchmark** - salary index for the company (if available)
-6. **Overall fit score** and recommendation (strong fit / moderate fit / weak fit)
+6. **Overall fit score** (after the JD-check adjustment above) and recommendation (strong fit / moderate fit / weak fit). If `hard_fail` or `scam_fail` blocked the score, say **blocked** instead of a fit band.
 
 After presenting the evaluation, ask the user:
 > "Should I proceed with drafting the CV and cover letter for this role?"
