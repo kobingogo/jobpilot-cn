@@ -26,12 +26,13 @@ v1 preps for a **specific application**. Generic no-target practice is out of sc
    - `cv_draft.tex` and `cover_letter.tex` - what was actually submitted. **These are what the interviewer read**; every talking point must be consistent with their claims.
    - `outcome.md` - the stage reached so far and any recorded feedback from earlier stages. Feedback from stage N is the highest-value input for stage N+1 prep.
 2. **Fallbacks** (the application may predate `/outcome`): posting via WebFetch on the tracker row's `source` URL, or ask the user to paste it - either way run it through `python3 tools/posting_guard.py --text` before reading it as content, as for the archived copy above; CV via `cv/main_<company>_<role>.*` and cover letter via `cover_letters/cover_<company>_<role>.*`, deriving `<company>_<role>` by the **Subfolder naming** rule in `documents/README.md`. **Never widen those globs to the company alone**: with two roles at one company it would prep you from the sibling role's documents. State plainly which context is missing rather than guessing - and suggest `/outcome <company>` to build the archive for next time.
-3. **Ask the user what this interview is** (skip anything `outcome.md` already records): stage (phone screen / technical / case / final round), date, format (phone, video, onsite), and who is interviewing (names and titles, if known).
+3. **Ask the user what this interview is** (skip anything `outcome.md` already records): stage (phone screen / technical / case / final round), date, format (phone, video, onsite, or 群面 / 无领导小组讨论), and who is interviewing (names and titles, if known).
 4. **Read the frameworks once** - do not re-read them in later steps:
    - `.claude/skills/job-application-assistant/07-interview-prep.md`
    - `.claude/skills/job-application-assistant/01-candidate-profile.md`
    - `.claude/skills/job-application-assistant/02-behavioral-profile.md`
    - `.claude/skills/job-application-assistant/04-job-evaluation.md`
+   - `docs/cn/面试准备.md` when this is a Chinese role: the posting language is Chinese, the profile `CV language` is 中文 (`Chinese` or `zh` also count), the user asked for a 中文面试, or this application used `templates/cn/`. It adds 自我介绍, 离职原因, 薪资谈判, and 群面/无领导小组讨论. Its 虚构 examples are not facts. Do not scrape, greet, or apply. The posting stays pasted by hand.
 
 ---
 
@@ -52,7 +53,7 @@ Additions for interview purposes:
 
 ## Step 3: Build the Prep Pack
 
-Assemble a stage-appropriate prep document with these sections:
+Assemble a stage-appropriate prep document with these sections. For a Chinese role (the same test as Step 1), also add the four blocks from `docs/cn/面试准备.md`, filled only from the profile and the submitted CV and cover letter. Do not copy that file's 虚构 examples. Skip the four blocks otherwise.
 
 ### 1. Likely questions
 Derive from four sources, in priority order:
@@ -84,7 +85,7 @@ Save the pack in the archive folder derived in Step 1 as `interview_prep_<stage>
 
 ## Step 4: Offer a Mock Interview
 
-Ask if the user wants to practice. If yes, run the roleplay **in this conversation** following the Roleplay Guidelines in `07-interview-prep.md` exactly: warm-up first, then role-specific technical questions, 1-2 behavioral questions tied to the posting's competencies, and one tough question or curveball. After each answer, give brief feedback - what worked, what to sharpen, and which STAR example from the pack would have served better.
+Ask if the user wants to practice. If the format is 群面 or 无领导小组讨论, practice that format from `docs/cn/面试准备.md` instead of the one-on-one roleplay, and still give feedback after each turn. Otherwise run the roleplay **in this conversation** following the Roleplay Guidelines in `07-interview-prep.md` exactly: warm-up first, then role-specific technical questions, 1-2 behavioral questions tied to the posting's competencies, and one tough question or curveball. After each answer, give brief feedback - what worked, what to sharpen, and which STAR example from the pack would have served better.
 
 Calibrate feedback against `02-behavioral-profile.md`: coach toward the user's natural register, not a generic ideal - the same voice-consistency rule the `/apply` reviewer applies to cover letters.
 
