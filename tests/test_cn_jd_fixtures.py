@@ -52,5 +52,24 @@ class Item1ThresholdSource(FixtureBase):
         self.assertEqual(self.check("jd3_social")["thresholds_source"], "custom")
 
 
+class Item2FalsePositives(FixtureBase):
+    def test_jd2_intern_clears_deposit_hotline_and_student_status(self):
+        report = self.check("jd2_intern")
+        self.assertEqual(report["thresholds_source"], "custom")
+        self.assertEqual(report["scam"], [])
+        self.assertNotIn("996", [item["phrase"] for item in report["jargon"]])
+        self.assertNotEqual(self.row(report, "degree")["status"], "fail")
+
+    def test_real_deposit_slang_and_degree_floor_still_count(self):
+        deposit = cn_jd_check.check_jd("需缴纳押金500元")
+        self.assertEqual(deposit["scam"], [{"category": "押金", "phrase": "押金"}])
+
+        slang = cn_jd_check.check_jd("公司996")
+        self.assertIn("996", [item["phrase"] for item in slang["jargon"]])
+
+        floored = cn_jd_check.check_jd("学历：硕士及以上")
+        self.assertEqual(floored["parsed"]["degree"]["required"], "master")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -120,9 +120,12 @@ SCAM = (
 )
 SCAM_PENALTY = 30
 
+# 免/包/零 waive a following fee ("免押金"). 难免 is not a waiver.
+# 红包/钱包/礼包 are not "the company covers this".
 _NEG = re.compile(
     r"(?:谨防|防范|预防|拒绝|严禁|禁止|杜绝|不要|不用|无需|无须|没有|不存在|从不|"
-    r"不收|不收取|不需要|不要求|免收|免费|并非|不是|无|非|未|勿|莫|不)"
+    r"不收|不收取|不需要|不要求|免收|免费|免除|并非|不是|无|非|未|勿|莫|"
+    r"(?<![不难未])免|(?<![红钱礼])包|零|不)"
     r"(?:任何|形式|的|和|与|及|再|做|搞|收|收取|缴纳|交纳|交|存在|接受|提供|属于|是|有|很){0,3}$"
 )
 
@@ -350,7 +353,9 @@ def parse_degree(text: str) -> dict:
             if _negated(text, absolute):
                 continue
             before = text[max(0, absolute - 6):absolute]
-            if re.search(r"培养|指导|招收|面向|服务", before):
+            # 培养/面向 describe the role. 在校/在读/应届 name the applicant
+            # ("在校硕士研究生"), not a degree floor.
+            if re.search(r"培养|指导|招收|面向|服务|在校|在读|应届", before):
                 continue
             after = region[match.end():match.end() + 8]
             if re.search(r"优先|为佳|加分|最好", after):
@@ -600,10 +605,30 @@ def parse_salary(text: str, original: str | None = None) -> dict:
     }
 
 
+# 400/800 hotlines are 10 digits: 400-996-1234, 4009961234, or with spaces.
+# The 996 in the middle is the number, not the work-hour slogan.
+_HOTLINE = re.compile(
+    r"(?<!\d)\(?\s*(?:400|800)\s*\)?(?:[\s\-]*\d){7,8}(?!\d)"
+)
+
+
+def _in_hotline(text: str, start: int, end: int) -> bool:
+    for match in _HOTLINE.finditer(text):
+        if match.start() <= start and end <= match.end():
+            return True
+    return False
+
+
 def _digit_bounded(text: str, start: int, end: int) -> bool:
+    """True when 996/007/995 is slang, not part of a longer number or hotline."""
     before = text[start - 1] if start else ""
     after = text[end] if end < len(text) else ""
-    return not before.isdigit() and not after.isdigit()
+    # 1996年: a digit on either side. 400-996-1234: "-" (or a digit) on both sides.
+    if before.isdigit() or after.isdigit():
+        return False
+    if before == "-" and after == "-":
+        return False
+    return not _in_hotline(text, start, end)
 
 
 def _overlaps(occupied, start: int, end: int) -> bool:
@@ -647,7 +672,7 @@ def _margin_pay(text: str, index: int) -> bool:
 def find_scams(text: str) -> list:
     hits = []
     seen = set()
-    pay_only = {"保证金", "风险金", "履约金", "报名费"}
+    pay_only = {"保证金", "风险金", "履约金", "报名费", "押金"}
     for category, phrases in SCAM:
         # "谨防虚假招聘" negates the long form; "假招聘" sits inside that span.
         blocked = []
