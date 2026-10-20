@@ -6,6 +6,9 @@ and the example résumé must stay obviously 虚构 so it cannot be mistaken for
 a candidate.
 """
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -153,6 +156,118 @@ class ChineseResumeTemplate(unittest.TestCase):
         self.assertIn("zhipin.com", fetcher)
         # The stock 2-page command is unchanged by the outreach path.
         self.assertEqual(PAGES_LINE.findall(apply), ["2"])
+
+    def test_example_embeds_simplified_cjk_when_noto_is_installed(self):
+        if shutil.which("xelatex") is None or shutil.which("pdffonts") is None:
+            self.skipTest("xelatex or pdffonts is not installed")
+        if not _noto_cjk_installed():
+            self.skipTest("Noto CJK is not installed")
+        sty = (CN / "cnresume.sty").read_text(encoding="utf-8")
+        noto, _, fandol = sty.partition("Falling back to Fandol")
+        for token in (
+            "NotoSerifCJK-Regular.ttc",
+            "NotoSerifCJK-Bold.ttc",
+            "NotoSansCJK-Regular.ttc",
+            "NotoSansCJK-Bold.ttc",
+            "FontIndex=2",
+            "Script=CJK",
+            "Language={Chinese Simplified}",
+        ):
+            self.assertIn(token, noto, token)
+        self.assertNotIn("FontIndex", fandol)
+        self.assertIn("FandolSong-Regular.otf", fandol)
+        with tempfile.TemporaryDirectory(prefix="cnresume-") as tmp:
+            proc = subprocess.run(
+                [
+                    "xelatex",
+                    "-interaction=nonstopmode",
+                    "-halt-on-error",
+                    f"-output-directory={tmp}",
+                    "example.tex",
+                ],
+                cwd=CN,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+            log_path = Path(tmp) / "example.log"
+            log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
+            log = f"{log}\n{proc.stdout}\n{proc.stderr}"
+            self.assertEqual(proc.returncode, 0, log[-4000:])
+            pdf = Path(tmp) / "example.pdf"
+            self.assertTrue(pdf.is_file(), "example.pdf was not written")
+            pages = _pdf_page_count(pdf, log)
+            self.assertEqual(pages, 1, log[-1500:])
+            fonts = subprocess.run(
+                ["pdffonts", str(pdf)],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            _assert_simplified_cjk(self, fonts, log)
+
+
+def _noto_cjk_installed() -> bool:
+    fc_list = shutil.which("fc-list")
+    if fc_list is not None:
+        found = subprocess.run(
+            [fc_list, ":family", "file"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if "NotoSerifCJK-Regular.ttc" in found.stdout or "Noto Serif CJK SC" in found.stdout:
+            return True
+    return any(
+        path.is_file()
+        for path in (
+            Path("/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"),
+            Path("/usr/share/fonts/noto-cjk/NotoSerifCJK-Regular.ttc"),
+        )
+    )
+
+
+def _pdf_page_count(pdf: Path, log: str) -> int:
+    pdfinfo = shutil.which("pdfinfo")
+    if pdfinfo is not None:
+        info = subprocess.run(
+            [pdfinfo, str(pdf)],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        match = re.search(r"(?m)^Pages:\s+(\d+)\s*$", info)
+        if match is None:
+            raise AssertionError(f"pdfinfo did not report a page count:\n{info}")
+        return int(match.group(1))
+    match = re.search(r"Output written on .+\((\d+) page", log)
+    if match is None:
+        raise AssertionError("could not determine the PDF page count")
+    return int(match.group(1))
+
+
+def _assert_simplified_cjk(test: unittest.TestCase, fonts: str, log: str) -> None:
+    """SC is either a CJKsc PostScript name, or FontIndex 2 plus locl.
+
+    fonts-noto-cjk ships a Super OTC. Every face shares one CFF table whose
+    FontName is Noto*CJKjp, so pdffonts keeps saying CJKjp after FontIndex=2.
+    Region-specific files do embed as CJKsc; then CJKjp must be absent.
+    """
+    if "CJKsc" in fonts:
+        test.assertNotIn("CJKjp", fonts)
+        return
+    # example.tex uses the serif face (including bold). Sans is declared but
+    # not selected, so it is not in this log; the sty text above covers it.
+    flat = re.sub(r"\(fontspec\)", "", log)
+    flat = re.sub(r"\s+", "", flat)
+    test.assertIn("Language={ChineseSimplified}", flat)
+    test.assertIn("language=ZHS", flat)
+    test.assertIn("NotoSerifCJK-Regular.ttc:2", flat)
+    test.assertIn("NotoSerifCJK-Bold.ttc:2", flat)
+    test.assertNotIn("language=JAN", flat)
+    test.assertIn("Noto", fonts)
+    test.assertNotIn("Fandol", fonts)
 
 
 def _between(text: str, start: str, end: str) -> str:

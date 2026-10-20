@@ -18,13 +18,40 @@
 % Noto CJK embeds a ToUnicode map, so pypdf (the extractor /apply tries first)
 % reads the Chinese text layer. Fandol, ctex's usual default, compiles from
 % texlive-lang-chinese alone but pypdf returns mojibake for the same page.
-% fontconfig name, not a kpathsea filename: Fandol is not visible to \IfFontExistsTF.
+% \IfFontExistsTF sees the fontconfig family. XeTeX still opens the OTC at
+% index 0 (Japanese), so the faces below name the .ttc and FontIndex=2 (SC).
+% Bold is the Bold collection. Language selects Simplified Chinese locl glyphs.
+% The shared CFF table is still named Noto*CJKjp, so pdffonts may not say CJKsc.
 \IfFontExistsTF{Noto Serif CJK SC}{%
-  \setCJKmainfont{Noto Serif CJK SC}[BoldFont={Noto Serif CJK SC Bold}]%
-  \setCJKsansfont{Noto Sans CJK SC}[BoldFont={Noto Sans CJK SC Bold}]%
-  \setCJKmonofont{Noto Sans CJK SC}%
-  \setCJKfamilyfont{zhsong}{Noto Serif CJK SC}[BoldFont={Noto Serif CJK SC Bold}]%
-  \setCJKfamilyfont{zhhei}{Noto Sans CJK SC}[BoldFont={Noto Sans CJK SC Bold}]%
+  \setCJKmainfont{NotoSerifCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSerifCJK-Bold.ttc}%
+  ]%
+  \setCJKsansfont{NotoSansCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSansCJK-Bold.ttc}%
+  ]%
+  \setCJKmonofont{NotoSansCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified}%
+  ]%
+  \setCJKfamilyfont{zhsong}{NotoSerifCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSerifCJK-Bold.ttc}%
+  ]%
+  \setCJKfamilyfont{zhhei}{NotoSansCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSansCJK-Bold.ttc}%
+  ]%
 }{%
   \PackageWarning{cnresume}{%
     Noto Serif CJK SC was not found. Falling back to Fandol.\MessageBreak
