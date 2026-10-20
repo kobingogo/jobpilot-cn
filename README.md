@@ -390,4 +390,4 @@ MIT
 
 `templates/cn/outreach.md` 是两段短讯：Boss直聘打招呼（2 到 3 句）和智联/猎聘申请附言。`/apply` 按档案填好，写到 `documents/applications/<company>_<role>/outreach.md`。使用者自己复制发送，命令不会打开网站，也不会自动打招呼或投递。追踪状态仍是 `drafted`。其中的林示意是**虚构**示例。
 
-可选模型是 DeepSeek、Kimi（Moonshot）、GLM（智谱）。配置与隐私说明见 [docs/cn/模型配置.md](docs/cn/模型配置.md)：简历正文会发到对应服务商，不是留在本机。仓库只有占位文件 `config/models.example.json` 和 `.env.example`（例如 `DEEPSEEK_API_KEY=your-key-here`），没有真实密钥，也不创建 `.env`。职位描述仍由人粘贴，不因此增加爬虫、自动打招呼或自动投递。
+可选模型是 DeepSeek、Kimi（Moonshot）、GLM（智谱）。Claude Code 读项目里的 `.claude/settings.local.json`（`env` 中的 `ANTHROPIC_BASE_URL` 等），不读 `.env`。配置与隐私说明见 [docs/cn/模型配置.md](docs/cn/模型配置.md)：简历正文会发到对应服务商，不是留在本机。仓库只提交示例 `.claude/settings.local.example.json`（默认 DeepSeek，token 是占位符 `YOUR_DEEPSEEK_API_KEY`）。复制成 `settings.local.json` 后自己填写；该文件已被 `.gitignore` 忽略，含明文密钥，不要提交，也不要贴进聊天。不要同时设置 `ANTHROPIC_API_KEY`。职位描述仍由人粘贴，不因此增加爬虫、自动打招呼或自动投递。

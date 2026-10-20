@@ -191,7 +191,9 @@ REQUIRED_IGNORE_RULES = [
     ".env",
     ".env.*",
     # jobpilot-cn: local candidate profile and credential files. .env.example
-    # is a secret-free template and is re-included via ALLOWED_IGNORE_NEGATIONS.
+    # is a secret-free tracked comment (model switching is docs/cn/模型配置.md
+    # and gitignored .claude/settings.local.json, not .env) and is re-included
+    # via ALLOWED_IGNORE_NEGATIONS.
     "profile/",
     # Local cn_jd_check thresholds. The tracked file is cn_filters.example.json;
     # this copy can name cities, age, and a pay floor.
@@ -201,7 +203,9 @@ REQUIRED_IGNORE_RULES = [
     # from commands, not a skill, so a plain rooted rule is correct here -
     # unlike the **/-prefixed job_scraper/upskill rules above.
     "company_research/*.json",
-    # Machine-local Claude Code user configuration and ad-hoc permissions approvals.
+    # Machine-local Claude Code user configuration, ad-hoc permission approvals,
+    # and provider env (plaintext key). The tracked placeholder is
+    # .claude/settings.local.example.json; do not broaden this rule to ignore it.
     ".claude/settings.local.json",
 ]
 
