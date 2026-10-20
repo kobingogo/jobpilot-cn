@@ -315,15 +315,17 @@ _AGE_MIN = re.compile(
     r"|(?<!\d)(\d{2})\s*(?:周岁|岁)\s*(?:及以上|以上)"
 )
 
+_PAY_UNIT = r"(?:[kK千万wW]元?|元|RMB|CNY)"
+_PAY_PERIOD = r"(?:月|年|month|year)"
 _SALARY_RANGE = re.compile(
-    r"(?<![\d.])(?P<min>\d+(?:\.\d+)?)\s*(?P<u1>[kK千万元wW])?"
+    rf"(?<![\d.])(?P<min>\d+(?:\.\d+)?)\s*(?P<u1>{_PAY_UNIT})?"
     r"\s*[-~到至]\s*"
-    r"(?P<max>\d+(?:\.\d+)?)\s*(?P<u2>[kK千万元wW])"
-    r"(?:\s*/\s*(?P<period>月|年))?"
+    rf"(?P<max>\d+(?:\.\d+)?)\s*(?P<u2>{_PAY_UNIT})"
+    rf"(?:\s*(?:RMB|CNY))?(?:\s*[/／]\s*(?P<period>{_PAY_PERIOD}))?", re.I,
 )
 _SALARY_SINGLE = re.compile(
-    r"(?<![\d.])(?P<min>\d+(?:\.\d+)?)\s*(?P<u>[kK千万元wW])\s*(?P<open>以上|起|\+)?"
-    r"(?:\s*/\s*(?P<period>月|年))?"
+    rf"(?<![\d.])(?P<min>\d+(?:\.\d+)?)\s*(?P<u>{_PAY_UNIT})\s*(?P<open>以上|起|\+)?"
+    rf"(?:\s*(?:RMB|CNY))?(?:\s*[/／]\s*(?P<period>{_PAY_PERIOD}))?", re.I,
 )
 # Short-period pay must be consumed before monthly parsing, even at 1000元/天.
 _SHORT_PAY = re.compile(
@@ -385,7 +387,7 @@ _LABOR_PHRASES = (
      "出现不签合同或以实习协议代替劳动合同表述，建议核对劳动关系及书面合同安排"),
 )
 
-NOTE = "Pasted JD only. Does not scrape, greet, or apply."
+NOTE = "仅检查手工粘贴的 JD，不抓取、不打招呼、不投递。Pasted JD only. Does not scrape, greet, or apply."
 
 
 def _force_utf8_output():
@@ -468,7 +470,7 @@ def load_filters(path=None) -> dict:
     """
     config_path, _source = resolve_config(path)
     try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
+        data = json.loads(config_path.read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         raise
     except OSError as exc:
@@ -496,16 +498,31 @@ def _canon_degree(value) -> str:
     raise ValueError(f"unknown degree {value!r}")
 
 
+_CITY_GROUPS = {"北上广深": ("北京", "上海", "广州", "深圳"),
+                "北上深广": ("北京", "上海", "深圳", "广州"),
+                "北上": ("北京", "上海")}
+_CITY_ALIASES = {"京": "北京", "沪": "上海", "穗": "广州", "深": "深圳"}
+
+
 def _norm_city(name: str) -> str:
     name = name.strip().strip("的").strip()
-    for suffix in ("特别行政区", "市", "省"):
-        if name.endswith(suffix) and len(name) > len(suffix):
-            name = name[: -len(suffix)]
-            break
-    mapped = _EN_CITIES.get(name.lower())
+    mapped = _EN_CITIES.get(name.lower()) or _CITY_ALIASES.get(name)
     if mapped:
         return mapped
+    # Only qualified administrative forms; don't infer a city from a district
+    # alone (e.g. 朝阳区 exists in more than one city).
+    for city in sorted(BUILTIN_CITIES - {"远程", "全国", "不限"}, key=len, reverse=True):
+        if name == city or re.fullmatch(re.escape(city) + r"市?(?:[\u4e00-\u9fff]+区)?", name):
+            return city
+    for suffix in ("特别行政区", "市", "省"):
+        if name.endswith(suffix) and len(name) > len(suffix):
+            return name[:-len(suffix)]
     return name
+
+
+def _expand_city(name: str) -> list:
+    name = name.strip()
+    return list(_CITY_GROUPS[name]) if name in _CITY_GROUPS else [_norm_city(name)]
 
 
 def _degree_level(word: str) -> str:
@@ -544,7 +561,7 @@ def _known_cities(filters: dict) -> set:
     accept = _section(filters, "city").get("accept") or []
     known = set(BUILTIN_CITIES)
     for city in accept:
-        known.add(_norm_city(str(city)))
+        known.update(_expand_city(str(city)))
     return known
 
 
@@ -557,6 +574,9 @@ def _city_tokens(chunk: str, known: set) -> list:
         if not part:
             continue
         part = re.sub(r"(base|办公|工作|地点)$", "", part, flags=re.I)
+        if part in _CITY_GROUPS:
+            found.extend(_expand_city(part))
+            continue
         norm = _norm_city(part)
         if norm in known or norm in {"远程", "全国", "不限"}:
             found.append(norm)
@@ -710,6 +730,22 @@ def _age_cap_notices(age: dict) -> list:
     ]
 
 
+def parse_title(text: str) -> dict:
+    """Normalize a stated title, keeping the original and career-stage words.
+
+    Conservative aliases only; this is not a candidate eligibility filter.
+    """
+    match = re.search(r"(?m)^\s*(?:岗位(?:名称)?|职位(?:名称)?|招聘岗位|role|job title)\s*[:：]\s*([^\n。；;]+)", text, re.I)
+    if not match:
+        return {"raw": "", "normalized": "", "family": None}
+    raw = match.group(1).strip()
+    normalized = re.sub(r"服务端|服务器端|后台", "后端", raw)
+    family = "backend" if "后端" in normalized else None
+    if not family and re.fullmatch(r"(?:Java|JAVA|java)\s*开发(?:工程师)?(?:实习生|实习)?", normalized):
+        family = "java_development"  # Java could be backend, Android, or tooling.
+    return {"raw": raw, "normalized": normalized, "family": family}
+
+
 def parse_cities(text: str, known: set) -> list:
     found = []
     for match in _CITY_LABEL.finditer(text):
@@ -764,8 +800,11 @@ def parse_hukou(text: str, known: set) -> dict:
 
 
 def _monthly_k(value: float, unit: str, annual: bool):
-    if unit.isascii():
-        unit = unit.lower()
+    unit = unit.lower()
+    if unit in {"rmb", "cny"}:
+        unit = "元"
+    elif unit.endswith("元") and len(unit) > 1:
+        unit = unit[:-1]
     if unit == "k":
         amount = value
     elif unit == "千":
@@ -784,9 +823,9 @@ def _monthly_k(value: float, unit: str, annual: bool):
 
 
 def _is_annual(text: str, start: int, period) -> bool:
-    if period == "年":
+    if period and period.lower() in {"年", "year"}:
         return True
-    if period == "月":
+    if period and period.lower() in {"月", "month"}:
         return False
     before = text[max(0, start - 8):start]
     if any(label in before for label in ("年薪", "年包", "年收入", "包年")):
@@ -1337,20 +1376,20 @@ def _labor_row(hits: list) -> dict:
 def _eval_degree(parsed: dict, filters: dict) -> dict:
     section = _section(filters, "degree")
     if not section:
-        return _row("degree", "unknown", parsed["evidence"], "degree filter not configured")
+        return _row("degree", "unknown", parsed["evidence"], "未配置学历筛选，请在 config/cn_filters.json 确认 degree.candidate")
     candidate = _canon_degree(section.get("candidate", "none"))
     required = parsed["required"]
     if required is None:
-        return _row("degree", "unknown", "", "JD states no degree")
+        return _row("degree", "unknown", "", "JD未注明学历，需向招聘方确认")
     if required == "none" or DEGREE_RANK[required] <= DEGREE_RANK[candidate]:
-        return _row("degree", "pass", parsed["evidence"], f"requires {required}; candidate is {candidate}")
+        return _row("degree", "pass", parsed["evidence"], f"要求学历 {required}；候选人学历 {candidate}")
     reject = bool(section.get("reject_if_required_above", True))
     status = "fail" if reject else "flag"
     return _row(
         "degree",
         status,
         parsed["evidence"],
-        f"requires {required}; candidate is {candidate}",
+        f"要求学历 {required}；候选人学历 {candidate}",
         ["degree_above_candidate"],
     )
 
@@ -1358,26 +1397,26 @@ def _eval_degree(parsed: dict, filters: dict) -> dict:
 def _eval_school(parsed: dict, filters: dict) -> dict:
     section = _section(filters, "school_tier")
     if not section:
-        return _row("school_tier", "unknown", parsed["evidence"], "school filter not configured")
+        return _row("school_tier", "unknown", parsed["evidence"], "未配置院校筛选")
     have = _satisfied_tiers(section.get("candidate_tiers") or [])
     if parsed["mode"] == "none":
-        return _row("school_tier", "unknown", "", "JD states no school tier")
+        return _row("school_tier", "unknown", "", "JD未注明院校层次")
     missing = [tier for tier in parsed["required"] if tier not in have]
     # Required tiers are alternatives (985/211): one match is enough.
     if parsed["mode"] == "preferred":
-        detail = f"preferred {'/'.join(parsed['required'])}"
+        detail = f"优先院校 {'/'.join(parsed['required'])}"
         if missing and len(missing) == len(parsed["required"]):
             return _row("school_tier", "flag", parsed["evidence"], detail, ["school_tier_preferred"])
         return _row("school_tier", "pass", parsed["evidence"], detail)
     if not missing or len(missing) < len(parsed["required"]):
-        return _row("school_tier", "pass", parsed["evidence"], f"requires {'/'.join(parsed['required'])}")
+        return _row("school_tier", "pass", parsed["evidence"], f"要求院校 {'/'.join(parsed['required'])}")
     reject = bool(section.get("reject_if_required", True))
     status = "fail" if reject else "flag"
     return _row(
         "school_tier",
         status,
         parsed["evidence"],
-        f"requires {'/'.join(parsed['required'])}",
+        f"要求院校 {'/'.join(parsed['required'])}",
         ["school_tier_required"],
     )
 
@@ -1385,10 +1424,10 @@ def _eval_school(parsed: dict, filters: dict) -> dict:
 def _eval_age(parsed: dict, filters: dict) -> dict:
     section = _section(filters, "age")
     if "candidate" not in section or section.get("candidate") is None:
-        return _row("age", "unknown", parsed["evidence"], "age filter not configured")
+        return _row("age", "unknown", parsed["evidence"], "未配置候选人年龄，不据此判定资格")
     age = _number(section, "candidate")
     if parsed["min"] is None and parsed["max"] is None:
-        return _row("age", "unknown", "", "JD states no age")
+        return _row("age", "unknown", "", "JD未注明年龄要求")
     codes = []
     if parsed["min"] is not None and age < parsed["min"]:
         codes.append("age_out_of_range")
@@ -1397,7 +1436,7 @@ def _eval_age(parsed: dict, filters: dict) -> dict:
     # The cap is visible even when the candidate is young enough.
     if parsed["max"] is not None:
         codes.append("age_cap")
-    detail = f"candidate { _round_num(age) } vs {parsed['min']}-{parsed['max']}"
+    detail = f"候选人年龄 { _round_num(age) }；要求 {parsed['min']}-{parsed['max']}"
     if "age_out_of_range" in codes:
         return _row("age", "fail", parsed["evidence"], detail, codes)
     if "age_cap" in codes:
@@ -1408,27 +1447,27 @@ def _eval_age(parsed: dict, filters: dict) -> dict:
 def _eval_city(cities: list, filters: dict) -> dict:
     section = _section(filters, "city")
     if not section:
-        return _row("city", "unknown", "", "city filter not configured")
-    accept = {_norm_city(str(city)) for city in (section.get("accept") or [])}
+        return _row("city", "unknown", "", "未配置城市筛选")
+    accept = {place for city in (section.get("accept") or []) for place in _expand_city(str(city))}
     if not cities:
-        return _row("city", "unknown", "", "JD states no city")
+        return _row("city", "unknown", "", "JD未注明可识别城市，需确认工作地点")
     if any(city in {"全国", "不限"} for city in cities):
-        return _row("city", "pass", "、".join(cities), "location is open")
+        return _row("city", "pass", "、".join(cities), "工作地点不限")
     matched = [city for city in cities if city in accept]
     evidence = "、".join(cities)
     if matched:
-        return _row("city", "pass", evidence, f"matches {'、'.join(matched)}")
+        return _row("city", "pass", evidence, f"城市匹配 {'、'.join(matched)}")
     if section.get("reject_unlisted", True):
-        return _row("city", "fail", evidence, f"{evidence} not in accept list", ["city_not_accepted"])
-    return _row("city", "flag", evidence, f"{evidence} not in accept list", ["city_not_accepted"])
+        return _row("city", "fail", evidence, f"{evidence} 不在可接受城市内，请核对 city.accept", ["city_not_accepted"])
+    return _row("city", "flag", evidence, f"{evidence} 不在可接受城市内，请核对 city.accept", ["city_not_accepted"])
 
 
 def _eval_hukou(parsed: dict, cities: list, filters: dict) -> dict:
     section = _section(filters, "hukou")
     if not section:
-        return _row("hukou", "unknown", parsed["evidence"], "hukou filter not configured")
+        return _row("hukou", "unknown", parsed["evidence"], "未配置户籍筛选")
     if parsed["mode"] == "none":
-        return _row("hukou", "unknown", "", "JD states no hukou requirement")
+        return _row("hukou", "unknown", "", "JD未注明户籍要求")
     have = {_norm_city(str(place)) for place in (section.get("has") or [])}
     job_cities = [city for city in cities if city not in {"远程", "全国", "不限"}]
 
@@ -1440,17 +1479,17 @@ def _eval_hukou(parsed: dict, cities: list, filters: dict) -> dict:
         return place in have
 
     if parsed["mode"] == "preferred":
-        return _row("hukou", "flag", parsed["evidence"], f"preferred hukou: {'、'.join(parsed['places'])}", ["hukou_preferred"])
+        return _row("hukou", "flag", parsed["evidence"], f"优先户籍：{'、'.join(parsed['places'])}", ["hukou_preferred"])
     missing = [place for place in parsed["places"] if not holds(place)]
     if not missing:
-        return _row("hukou", "pass", parsed["evidence"], f"hukou ok: {'、'.join(parsed['places'])}")
+        return _row("hukou", "pass", parsed["evidence"], f"户籍匹配：{'、'.join(parsed['places'])}")
     reject = bool(section.get("reject_if_required", True))
     status = "fail" if reject else "flag"
     return _row(
         "hukou",
         status,
         parsed["evidence"],
-        f"requires hukou: {'、'.join(parsed['places'])}",
+        f"要求户籍：{'、'.join(parsed['places'])}",
         ["hukou_required"],
     )
 
@@ -1484,12 +1523,12 @@ def _eval_salary_thresholds(parsed: dict, filters: dict) -> dict:
                     f"日薪 {parsed['min_daily']}-{parsed['max_daily']}元/天；底线 {_round_num(floor)}元/天；不折算为月薪",
                     ["salary_daily_below_floor"] if failed else [])
     if not section:
-        return _row("salary", "unknown", parsed["evidence"], "salary filter not configured")
+        return _row("salary", "unknown", parsed["evidence"], "未配置薪资底线")
     floor = _number(section, "min_monthly_k") if "min_monthly_k" in section else None
     min_months = _number(section, "min_months") if "min_months" in section else None
     if parsed["min_monthly_k"] is None and parsed["months"] is None:
         evidence = parsed["evidence"] or ""
-        detail = "salary not stated" if not evidence else f"salary not stated ({evidence})"
+        detail = "薪资未注明，需确认" if not evidence else f"薪资未注明，需确认 ({evidence})"
         return _row("salary", "unknown", evidence, detail)
     codes = []
     high = parsed["max_monthly_k"]
@@ -1505,11 +1544,11 @@ def _eval_salary_thresholds(parsed: dict, filters: dict) -> dict:
     if parsed["min_monthly_k"] is not None:
         bits.append(f"{parsed['min_monthly_k']}-{parsed['max_monthly_k']}K")
     if parsed["months"] is not None:
-        bits.append(f"{parsed['months']} months")
+        bits.append(f"{parsed['months']}薪")
     if floor is not None:
-        bits.append(f"floor { _round_num(floor) }K")
+        bits.append(f"底线 { _round_num(floor) }K")
     if min_months is not None:
-        bits.append(f"min { _round_num(min_months) } months")
+        bits.append(f"至少 { _round_num(min_months) }薪")
     status = "fail" if codes else "pass"
     return _row("salary", status, parsed["evidence"], "; ".join(bits), codes)
 
@@ -1632,6 +1671,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
             "school_tier": school,
             "age": age,
             "cities": cities,
+            "title": parse_title(folded),
             "hukou": hukou,
             "salary": salary,
             "campus": campus,
@@ -1647,10 +1687,10 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
 
 def _read_input(path: Path | None) -> str:
     if path is not None:
-        return path.read_bytes().decode("utf-8", errors="replace")
+        return path.read_bytes().decode("utf-8-sig")
     buffer = getattr(sys.stdin, "buffer", None)
     if buffer is not None:
-        return buffer.read().decode("utf-8", errors="replace")
+        return buffer.read().decode("utf-8-sig")
     return sys.stdin.read()
 
 
@@ -1658,30 +1698,30 @@ def main(argv=None) -> int:
     _force_utf8_output()
     parser = argparse.ArgumentParser(
         prog="cn_jd_check.py",
-        description="Check a hand-pasted Chinese JD against local hard filters. Prints JSON.",
+        description="检查手工粘贴的中文 JD，按本地阈值输出 JSON；不联网、不投递。",
     )
-    parser.add_argument("--in", dest="infile", type=Path, default=None, help="JD text file (default: stdin)")
-    parser.add_argument("path", nargs="?", type=Path, help="JD text file; omit to read stdin")
+    parser.add_argument("--in", dest="infile", type=Path, default=None, help="UTF-8 JD 文本文件（默认从标准输入读取）")
+    parser.add_argument("path", nargs="?", type=Path, help="UTF-8 JD 文件；不填则读取标准输入")
     parser.add_argument(
         "--config",
         type=Path,
         default=None,
-        help="filter JSON (default: config/cn_filters.json if it exists, else config/cn_filters.example.json)",
+        help="筛选 JSON：默认 config/cn_filters.json；缺失时使用 example 提示阈值",
     )
     args = parser.parse_args(argv)
     if args.infile is not None and args.path is not None:
-        print("cn_jd_check: pass either --in FILE or a positional path, not both", file=sys.stderr)
+        print("cn_jd_check: --in FILE 与位置参数只能选一种；请删除重复文件参数", file=sys.stderr)
         return 2
     source = args.infile or args.path
     try:
         raw = _read_input(source)
-    except OSError as exc:
-        print(f"cn_jd_check: cannot read JD: {exc}", file=sys.stderr)
+    except (OSError, UnicodeError) as exc:
+        print(f"cn_jd_check: 无法读取 JD：{exc}；请检查路径和文件权限，并另存为 UTF-8（不要使用 GBK）", file=sys.stderr)
         return 2
     try:
         report = check_jd(raw, config_path=args.config)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        print(f"cn_jd_check: {exc}", file=sys.stderr)
+        print(f"cn_jd_check: 配置读取或校验失败：{exc}；请检查 --config 路径、JSON 格式及字段类型，参阅 docs/cn/岗位检查器.md", file=sys.stderr)
         return 2
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

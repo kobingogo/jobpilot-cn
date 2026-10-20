@@ -297,19 +297,20 @@ def _cn_flag(value, name: str) -> bool:
     raise ValueError(f"{name} must be a boolean")
 
 
-def cn_adjust(result: dict, score: int) -> tuple[int, bool, bool, int, int]:
+def cn_adjust(result: dict, score: int) -> tuple[int, bool, bool, int, int, int]:
     """Apply tools/cn_jd_check.py fields. Missing keys leave the score alone.
 
-    jargon_penalty and scam_penalty lower the weighted score (floor 0).
+    jargon_penalty, scam_penalty and labor_penalty lower the weighted score (floor 0).
     hard_fail and scam_fail block: the caller vetoes the row.
     """
     if not isinstance(result, dict):
         raise ValueError("result must be an object")
     jargon = _cn_number(result["jargon_penalty"], "jargon_penalty") if "jargon_penalty" in result else 0
     scam = _cn_number(result["scam_penalty"], "scam_penalty") if "scam_penalty" in result else 0
+    labor = _cn_number(result["labor_penalty"], "labor_penalty") if "labor_penalty" in result else 0
     hard_fail = _cn_flag(result["hard_fail"], "hard_fail") if "hard_fail" in result else False
     scam_fail = _cn_flag(result["scam_fail"], "scam_fail") if "scam_fail" in result else False
-    return max(0, score - jargon - scam), hard_fail, scam_fail, jargon, scam
+    return max(0, score - jargon - scam - labor), hard_fail, scam_fail, jargon, scam, labor
 
 
 def overall_score(scores: dict) -> int:
@@ -421,7 +422,7 @@ def cmd_apply(args) -> int:
 
         try:
             score = overall_score(result.get("scores") or {})
-            score, hard_fail, scam_fail, jargon_penalty, scam_penalty = cn_adjust(result, score)
+            score, hard_fail, scam_fail, jargon_penalty, scam_penalty, labor_penalty = cn_adjust(result, score)
         except ValueError as exc:
             errors.append({"key": key, "error": str(exc)})
             continue
@@ -490,6 +491,7 @@ def cmd_apply(args) -> int:
             ("scam_fail", scam_fail),
             ("jargon_penalty", jargon_penalty),
             ("scam_penalty", scam_penalty),
+            ("labor_penalty", labor_penalty),
         ):
             if name in result:
                 entry[name] = value
@@ -518,6 +520,7 @@ def cmd_apply(args) -> int:
                 "scam_fail": scam_fail,
                 "jargon_penalty": jargon_penalty,
                 "scam_penalty": scam_penalty,
+                "labor_penalty": labor_penalty,
             }
         )
 

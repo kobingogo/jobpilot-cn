@@ -369,7 +369,7 @@ class CheckJd(unittest.TestCase):
             code, out, err = _run(["--in", str(missing)])
             self.assertEqual(code, 2)
             self.assertEqual(out, "")
-            self.assertIn("cannot read", err)
+            self.assertIn("无法读取 JD", err)
 
             code, out, err = _run(["--in", str(path), "--config", str(Path(tmp) / "no.json")])
             self.assertEqual(code, 2)
@@ -377,7 +377,7 @@ class CheckJd(unittest.TestCase):
 
             code, _out, err = _run(["--in", str(path), str(path)])
             self.assertEqual(code, 2)
-            self.assertIn("not both", err)
+            self.assertIn("只能选一种", err)
 
     def test_cli_utf8_when_stdout_encoding_is_legacy(self):
         with tempfile.TemporaryDirectory() as tmp:
