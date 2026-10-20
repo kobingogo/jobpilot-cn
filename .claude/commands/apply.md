@@ -65,6 +65,8 @@ The script reads that text only (default config). It does not fetch, scrape, gre
 
 For `Career stage: campus / intern` (校招/实习) in the profile, evaluate experience using relevant coursework, projects, internships, competitions and campus contributions, following `04-job-evaluation.md`. Do not lower the score solely for having no full-time employer, and do not turn project time into employment years. Confirm missing student status or cohort facts; do not silently replace them from the JD. The checker uses `campus.mode`, `campus.graduation_year`, `labor.candidate_is_student` and `salary.min_daily` from the user's config populated by `/setup`; `parsed.campus` identifies JD mode. Daily pay is compared only with the daily threshold, not monthly salary or pay-month counts. Labor rows remain risk hints and never veto.
 
+Honor the user's Round 5 opt-ins documented in `docs/cn/第五轮产品决策.md`. Show `availability_*` and `salary_annual_total` flags as questions to confirm, without deductions or vetoes. `parsed.employer` contains only unverified JD self-description when enabled; neither it nor `parsed.working_hours` adds points, implies 编制 or cancels other risks. Keep the checker's returned penalties as authoritative; do not re-apply the legacy flexible-work penalty when the user opted into the overtime-context rule. 年包/12 is a reference, never proof of guaranteed monthly pay; 薪数 is not proof of guaranteed bonus.
+
 ### Source Host Verification (when input is a URL)
 
 Before proceeding to drafting, inspect the posting URL's hostname to verify provenance (#431). Classify the host into one of three categories:
@@ -136,7 +138,7 @@ Also read the most recent existing CV and cover letter files for concrete struct
 ### Cover Letter (`cover_letters/cover_<company>_<role><COVER_EXT>`)
 - **Match the language of the job posting** (Danish posting -> Danish cover letter, English posting -> English cover letter, Chinese posting -> Chinese cover letter)
 - Follow the structure from `06-cover-letter-templates.md`
-- Use the `cover.cls` template; for a Chinese letter, add ctex and `../templates/cn/cnfonts` exactly as `06-cover-letter-templates.md` prescribes, even if the CV uses an active custom template
+- Use the `cover.cls` template; for a Chinese letter, add ctex, `../templates/cn/cnfonts` and `../templates/cn/cncover` (A4) exactly as `06-cover-letter-templates.md` prescribes, even if the CV uses an active custom template
 - Tailor the opening paragraph to the specific role and company
 - Address to a named person if available in the posting, otherwise「您好：」for Chinese or "Dear Hiring Manager" (or equivalent in posting language)
 - Keep to approximately one page
