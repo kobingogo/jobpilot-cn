@@ -185,6 +185,10 @@ REQUIRED_IGNORE_RULES = [
     # fetching service, and that skill reads an API token from the environment.
     ".env",
     ".env.*",
+    # jobpilot-cn: local candidate profile and credential files. .env.example
+    # is a secret-free template and is re-included via ALLOWED_IGNORE_NEGATIONS.
+    "profile/",
+    "*.token",
     # Company research cache (/apply Step 3, /interview Step 2). Referenced
     # from commands, not a skill, so a plain rooted rule is correct here -
     # unlike the **/-prefixed job_scraper/upskill rules above.
@@ -205,6 +209,8 @@ ALLOWED_IGNORE_NEGATIONS = {
     "!cv/main_example.tex",
     "!cover_letters/cover_example.tex",
     "!documents/**/.gitkeep",
+    # Tracks the secret-free template; .env and every other .env.* stay ignored.
+    "!.env.example",
 }
 
 # Hook commands the template legitimately ships, as "<Event>:<command>" strings.

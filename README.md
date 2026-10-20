@@ -378,3 +378,9 @@ Thinking about a PR? Read [CONTRIBUTING.md](CONTRIBUTING.md) first - it explains
 ## License
 
 MIT
+
+## 中文本地化（jobpilot-cn）
+
+本仓库（jobpilot-cn）是上游项目 [ai-job-search](https://github.com/MadsLorentzen/ai-job-search) 的中文本地化分支。上游作者为 [Mads Lorentzen](https://github.com/MadsLorentzen)，许可证为 MIT。本仓库保留上游 `LICENSE` 原文，不另行替换或删改。
+
+本分支面向中国招聘平台：Boss直聘、智联、拉勾、猎聘。这里没有爬虫，也不会自动投递。职位描述（JD）由使用者手工粘贴，再进入匹配评估以及简历、求职信的撰写流程。
