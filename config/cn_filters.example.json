@@ -1,5 +1,5 @@
 {
-  "_comment": "Fictional search thresholds for tools/cn_jd_check.py. Not a real person: no name, phone, email, or ID. Copy this file to config/cn_filters.json (gitignored) and edit that copy. The checker reads cn_filters.json when it exists; these example numbers are hints only. Do not put real personal data in this file. campus.mode: auto detects JD 校招/应届/实习/届; campus/intern/experienced override the mode, never student identity. graduation_year is a four-digit graduation cohort, not birth year. salary.min_daily is yuan/day, never monthly K. labor.candidate_is_student is the sole confirmed student-status setting; null means unknown.",
+  "_comment": "Fictional search thresholds for tools/cn_jd_check.py. Not a real person: no name, phone, email, or ID. Copy this file to config/cn_filters.json (gitignored) and edit that copy. The checker reads cn_filters.json when it exists; these example numbers are hints only. Do not put real personal data in this file. campus.mode: auto detects JD 校招/应届/实习/届; campus/intern/experienced override the mode, never student identity. graduation_year is a four-digit graduation cohort, not birth year. salary.min_daily is yuan/day, never monthly K. labor.candidate_is_student is the sole confirmed student-status setting; null means unknown. Round 5: availability fields and min_annual_total_k default null (soft reminders only); employer detection and overtime-only flexible-work scoring default false. compare_annual_as_monthly stays true for compatibility; opt into false to stop comparing annual /12 to monthly floor. Full key definitions: docs/cn/第五轮产品决策.md.",
   "degree": {
     "candidate": "bachelor",
     "reject_if_required_above": true
@@ -22,7 +22,9 @@
   "salary": {
     "min_monthly_k": 20,
     "min_months": 13,
-    "min_daily": 200
+    "min_daily": 200,
+    "compare_annual_as_monthly": true,
+    "min_annual_total_k": null
   },
   "labor": {
     "candidate_is_student": null
@@ -30,5 +32,16 @@
   "campus": {
     "mode": "auto",
     "graduation_year": null
+  },
+  "availability": {
+    "days_per_week": null,
+    "duration_months": null,
+    "start_date": null
+  },
+  "employer": {
+    "detect_self_description": false
+  },
+  "jargon": {
+    "flexible_work_overtime_only": false
   }
 }

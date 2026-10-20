@@ -33,7 +33,9 @@ read. A reject verdict is still exit 0: the JSON says why.
 """
 
 import argparse
+from datetime import date
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -344,6 +346,11 @@ _MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})(?:\s*[-~到至]\s*\d{1,2})?\s*(?:薪
 _BASE_PAY = re.compile(r"(?:无责底薪|底薪|保底|基本工资|固定工资)\s*[:：为是]?\s*$")
 _VARIABLE_PAY = re.compile(r"无责底薪|底薪|保底|提成|佣金")
 _HUKOU = re.compile(r"(?P<prefix>.{0,12})(?P<kind>户口|户籍)")
+_HUKOU_SHORT_PLACES = dict(zip("京沪津渝粤冀晋辽吉黑苏浙皖闽赣鲁豫鄂湘琼川黔滇陕甘青台桂宁新藏蒙",
+                              ("北京", "上海", "天津", "重庆", "广东", "河北", "山西", "辽宁", "吉林", "黑龙江",
+                               "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南", "海南",
+                               "四川", "贵州", "云南", "陕西", "甘肃", "青海", "台湾", "广西", "宁夏", "新疆", "西藏", "内蒙古")))
+_HUKOU_SHORT = re.compile(r"(?P<non>非)?(?P<place>[" + "".join(_HUKOU_SHORT_PLACES) + r"])籍")
 
 _CN_DIGITS = "零一二三四五六七八九"
 _LABOR_NUMBER = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百]+)"
@@ -484,6 +491,7 @@ def load_filters(path=None) -> dict:
         _section(data, key)
     _labor_student(data)
     _campus_settings(data)
+    _round5_settings(data)
     return data
 
 
@@ -790,12 +798,57 @@ def parse_hukou(text: str, known: set) -> dict:
         target.append(place or "未注明")
         if not evidence:
             evidence = text[max(0, kind_at - 8):match.end() + (2 if "优先" in after else 0)].strip()
+    base_required = list(places)
+    excluded = []
+    alternatives = False
+    short_evidence = {"required": [], "preferred": [], "excluded": []}
+    for match in _HUKOU_SHORT.finditer(text):
+        left, right = _clause_span(text, match.start(), commas=True)
+        clause = text[left:right]
+        before = text[left:match.start()]
+        after = text[match.end():right]
+        exclusion = bool(re.search(r"(?:不招|不接受|排除|不要|不考虑|谢绝)\s*$", before))
+        rejection = bool(re.match(r"\s*(?:勿投|不招|除外|不要|不考虑|谢绝)", after))
+        non = bool(match.group("non"))
+        non_rejected = non and (exclusion or rejection)
+        short_group = list(_HUKOU_SHORT.finditer(clause))
+        open_group = (any(m.group("non") for m in short_group)
+                      and any(not m.group("non") for m in short_group)
+                      and bool(re.search(r"均可|皆可|都可", clause)))
+        # Rejecting non-X applicants requires X; allowing or preferring them
+        # does not require X. Keep bare non-X restrictions for manual review.
+        if ((_negated(text, match.start()) and not exclusion)
+                or re.search(r"(?:不要求|不需要|无需|无须)\s*$", before)
+                or re.search(r"不限|不限制|不限定", before)
+                or re.match(r"\s*(?:户籍|户口)?\s*(?:不限|不限制|不限定|亦可|也可|可报)", after)
+                or (non and not non_rejected
+                    and re.match(r"\s*(?:优先|可)", after))
+                or open_group):
+            continue
+        place = _HUKOU_SHORT_PLACES[match.group("place")]
+        if not non_rejected and (non or rejection or exclusion):
+            excluded.append(place)
+            short_evidence["excluded"].append(clause)
+            continue
+        mode = "preferred" if not non_rejected and ("优先" in after or "优先" in before) else "required"
+        if mode == "required" and len(short_group) > 1 and re.search(r"或|/|、|均可|皆可", clause):
+            alternatives = True
+        (preferred if mode == "preferred" else places).append(place)
+        short_evidence[mode].append(clause)
     hard = _unique(places)
     soft = [place for place in _unique(preferred) if place not in hard]
+    if excluded or (alternatives and (base_required or len(_unique(short_evidence["required"])) > 1)):
+        # Negative or conflicting eligibility cannot be proved from an empty
+        # candidate list. Keep it visible for manual review, never hard-reject.
+        return {"required": False, "places": hard, "excluded_places": _unique(excluded),
+                "mode": "review", "evidence": "；".join(_unique(
+                    [evidence] + short_evidence["required"] + short_evidence["excluded"])).strip("；")}
     if hard:
-        return {"required": True, "places": hard, "mode": "required", "evidence": evidence}
+        return {"required": True, "places": hard, "mode": "alternatives" if alternatives else "required",
+                "evidence": "；".join(_unique(short_evidence["required"])) or evidence}
     if soft:
-        return {"required": False, "places": soft, "mode": "preferred", "evidence": evidence}
+        return {"required": False, "places": soft, "mode": "preferred",
+                "evidence": "；".join(_unique(short_evidence["preferred"])) or evidence}
     return {"required": False, "places": [], "mode": "none", "evidence": ""}
 
 
@@ -999,7 +1052,24 @@ def _overlaps(occupied, start: int, end: int) -> bool:
     return any(not (end <= left or start >= right) for left, right in occupied)
 
 
-def find_jargon(text: str) -> list:
+def _clause_span(text: str, index: int, commas: bool = False) -> tuple[int, int]:
+    """Sentence/semicolon boundary; commas may join a work-hours statement."""
+    separators = "。；;！!？?\n" + ("，," if commas else "")
+    left = max((text.rfind(char, 0, index) for char in separators), default=-1) + 1
+    right = min((p for char in separators if (p := text.find(char, index)) >= 0), default=len(text))
+    return left, right
+
+
+def _overtime_context(text: str, index: int) -> bool:
+    left, right = _clause_span(text, index)
+    for match in re.finditer(r"加班|随时待命|随叫随到|996|007|995", text[left:right]):
+        start, end = left + match.start(), left + match.end()
+        if not _negated(text, start) and (not match[0].isdigit() or _digit_bounded(text, start, end)):
+            return True
+    return False
+
+
+def find_jargon(text: str, flexible_work_overtime_only: bool = False) -> list:
     # A negated long phrase also blocks a shorter alias inside it
     # ("不接受抗压能力强" must not still count "抗压能力").
     occupied = []
@@ -1022,6 +1092,9 @@ def find_jargon(text: str) -> list:
                 continue
             occupied.append((index, end))
             if _negated(text, index):
+                continue
+            if (flexible_work_overtime_only and phrase in {"弹性工作", "弹性工作制"}
+                    and not _overtime_context(text, index)):
                 continue
             hits.append({"phrase": phrase, "penalty": penalty, "at": index})
     hits.sort(key=lambda item: item["at"])
@@ -1174,6 +1247,168 @@ def _campus_settings(filters: dict) -> tuple:
     if year is not None and (isinstance(year, bool) or not isinstance(year, int) or not 2000 <= year <= 2099):
         raise ValueError("campus.graduation_year must be a four-digit integer or null")
     return mode, year
+
+
+def _round5_settings(filters: dict) -> dict:
+    """Validate opt-ins even when a JD has no relevant evidence."""
+    settings = {}
+    for section, key, default in (("employer", "detect_self_description", False),
+                                  ("jargon", "flexible_work_overtime_only", False),
+                                  ("salary", "compare_annual_as_monthly", True)):
+        value = _section(filters, section).get(key, default)
+        if not isinstance(value, bool):
+            raise ValueError(f"{section}.{key} must be a boolean")
+        settings[key] = value
+    availability = _section(filters, "availability")
+    for section, key in ((availability, "days_per_week"), (availability, "duration_months"),
+                         (_section(filters, "salary"), "min_annual_total_k")):
+        value = section.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                  or not math.isfinite(value) or value <= 0):
+            raise ValueError(f"{key} must be a positive finite number or null")
+        if key == "days_per_week" and value is not None and (value > 7 or int(value) != value):
+            raise ValueError("availability.days_per_week must be an integer from 1 to 7 or null")
+    start = availability.get("start_date")
+    if start is not None:
+        try:
+            if not isinstance(start, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", start):
+                raise ValueError
+            date.fromisoformat(start)
+        except ValueError as exc:
+            raise ValueError("availability.start_date must be YYYY-MM-DD or null") from exc
+    return settings
+
+
+def parse_employer(text: str, enabled: bool) -> dict:
+    """Only explicit self-description, never client names, school or ownership guesses."""
+    mentions = []
+    if enabled:
+        pattern = re.compile(
+            r"(?:企业性质|单位性质|公司性质|雇主类型)\s*[:：]\s*"
+            r"(?P<label>中央企业|国有企业|事业单位|民营企业|外资企业|央企|国企|外企|民企)"
+            r"(?!子公司|客户|服务|背景|项目|合作|供应|控股|参股|旗下|投资)"
+            r"|(?:本公司|本单位|本企业|我们)\s*(?:是|为|属于|系)\s*(?:一家|一所)?\s*"
+            r"(?P<self>中央企业|国有企业|事业单位|民营企业|外资企业|央企|国企|外企|民企)"
+            r"(?!子公司|客户|服务|背景|项目|合作|供应|控股|参股|旗下|投资)"
+        )
+        aliases = {"中央企业": "央企", "国有企业": "国企", "外资企业": "外企", "民营企业": "民企"}
+        for match in pattern.finditer(text):
+            if _negated(text, match.start()):
+                continue
+            kind = match.group("label") or match.group("self")
+            mentions.append({"type": aliases.get(kind, kind), "status": "info",
+                             "evidence": match[0], "verified": False})
+    return {"enabled": enabled, "mentions": mentions,
+            "note": "仅JD自称，未经核验；不推断编制、签约主体，不评分或筛选"}
+
+
+def parse_availability(text: str) -> dict:
+    patterns = {
+        "days_per_week": re.compile(
+            rf"每周\s*(?:至少|不少于|不低于|到岗|出勤|实习|工作|保证|可|需|须|要求|[:：]|\s)*"
+            rf"(?P<n>{_LABOR_NUMBER})(?:\s*[-~至到]\s*{_LABOR_NUMBER})?\s*天"),
+        "duration_months": re.compile(
+            rf"(?:实习(?:期|时长|时间)?|持续(?:实习)?|至少实习)\s*"
+            rf"(?:至少|不少于|不低于|需|须|要求|为|[:：]|\s)*(?P<n>{_LABOR_NUMBER})"
+            rf"(?:\s*[-~至到]\s*{_LABOR_NUMBER})?\s*个?月"),
+    }
+    result = {key: {"value": None, "evidence": ""} for key in (*patterns, "start_date")}
+    for key, pattern in patterns.items():
+        hits = [m for m in pattern.finditer(text) if not _negated(text, m.start())
+                and not re.match(r"\s*(?:以下|以内|内(?!推))", text[m.end():])]
+        if hits:
+            # Multiple mentions retain the strictest stated lower bound. The
+            # result stays soft because preferences/negotiability need review.
+            match = max(hits, key=lambda m: _labor_number(m.group("n")))
+            value = _labor_number(match.group("n"))
+            if value > 0 and (key != "days_per_week" or value <= 7):
+                result[key] = {"value": value, "evidence": match[0]}
+    explicit_date = r"(?P<y>20\d{2})[-年/](?P<m>\d{1,2})[-月/](?P<d>\d{1,2})日?"
+    pattern = re.compile(r"(?:最晚|不晚于|到岗时间\s*[:：])\s*" + explicit_date
+                         + r"(?:\s*(?:前|之前)?\s*到岗)?|" +
+                         explicit_date.replace("?P<", "?P<alt_") + r"\s*(?:前|之前)\s*到岗")
+    hits = []
+    for match in pattern.finditer(text):
+        if _negated(text, match.start()):
+            continue
+        prefix = "" if match.group("y") else "alt_"
+        try:
+            value = date(*(int(match.group(prefix + part)) for part in ("y", "m", "d"))).isoformat()
+        except ValueError:
+            continue
+        hits.append((value, match[0]))
+    if hits:
+        value, evidence = min(hits)
+        result["start_date"] = {"value": value, "evidence": evidence}
+    return result
+
+
+def _eval_availability(parsed: dict, campus: dict, filters: dict) -> list:
+    if campus["mode"] != "intern":
+        return []
+    section = _section(filters, "availability")
+    rows = []
+    for key, label in (("days_per_week", "每周到岗天数"), ("duration_months", "持续月数"),
+                       ("start_date", "最晚到岗日期")):
+        candidate, requirement = section.get(key), parsed[key]["value"]
+        if candidate is None:
+            continue  # Off by default, no new verdict or score effects.
+        status = "unknown" if requirement is None else "pass"
+        if requirement is not None and (candidate > requirement if key == "start_date" else candidate < requirement):
+            status = "flag"
+        rows.append(_row("availability_" + key, status, parsed[key]["evidence"],
+                         f"{label}：候选人 {candidate}；JD {requirement}；仅提示，需确认安排",
+                         ["availability_mismatch"] if status == "flag" else []))
+    return rows
+
+
+def _eval_annual_total(text: str, filters: dict) -> list:
+    floor = _section(filters, "salary").get("min_annual_total_k")
+    if floor is None:
+        return []
+    # Separate explicit annual clauses only. Never multiply a monthly salary,
+    # count a bonus as a package, or use the legacy parser's chosen base as total.
+    amounts, evidence = [], []
+    for clause in re.split(r"[。；;！!？?\n，,]", text):
+        occupied = []
+        for pattern in (_SALARY_RANGE, _SALARY_SINGLE):
+            for match in pattern.finditer(clause):
+                if _overlaps(occupied, match.start(), match.end()):
+                    continue
+                occupied.append((match.start(), match.end()))
+                before = clause[:match.start()]
+                label = re.search(r"(?:年包|年薪|年度总包|年度总薪酬)\s*[:：为]?\s*$", before)
+                explicit = (match.group("period") or "").lower() in {"年", "year"}
+                if not (label or explicit) or _negated(clause, label.start() if label else match.start()):
+                    continue
+                if ((match.group("period") or "").lower() in {"月", "month"}
+                        or (label is None and re.search(r"奖金|年终奖|补贴|补助|提成|佣金", before))):
+                    continue
+                if pattern is _SALARY_RANGE:
+                    unit = match.group("u2")
+                    # Raw, unrounded conversion avoids annual /12 rounding at a threshold.
+                    values = [_monthly_k(float(match.group("min")), match.group("u1") or unit, True),
+                              _monthly_k(float(match.group("max")), unit, True)]
+                    amount = max(values) if all(v is not None for v in values) else None
+                else:
+                    if match.group("open"):
+                        continue  # No ceiling: cannot declare it below a floor.
+                    amount = _monthly_k(float(match.group("min")), match.group("u"), True)
+                if amount is not None:
+                    amounts.append(amount * 12)
+                    evidence.append(clause)
+    status = "unknown" if not amounts else "flag" if max(amounts) + 1e-6 < floor else "pass"
+    upper = _round_num(max(amounts)) if amounts else "未知"
+    return [_row("salary_annual_total", status, "；".join(_unique(evidence)),
+                 f"年包上界 {upper}K/年；总额底线 {floor}K/年；含浮动部分也不代表保证收入；仅提示",
+                 ["annual_total_below_floor"] if status == "flag" else [])]
+
+
+def parse_working_hours(text: str) -> list:
+    return [{"status": "info", "evidence": m[0], "detail": "JD自述965，需核实实际工时；不加分或抵扣风险"}
+            for m in re.finditer("965", text)
+            if _digit_bounded(text, m.start(), m.end()) and not _negated(text, m.start())
+            and not re.search(r"(?:不|未)(?:实行|采用|执行)\s*$", text[max(0, m.start() - 8):m.start()])]
 
 
 def _student_mentions(text: str) -> list:
@@ -1464,11 +1699,19 @@ def _eval_city(cities: list, filters: dict) -> dict:
 
 def _eval_hukou(parsed: dict, cities: list, filters: dict) -> dict:
     section = _section(filters, "hukou")
+    if parsed["mode"] == "review":
+        return _row("hukou", "flag", parsed["evidence"],
+                    "含排除性、冲突或组合条件，需人工核对资格；不从学校或未配置户籍推断",
+                    ["hukou_exclusion_review"])
     if not section:
         return _row("hukou", "unknown", parsed["evidence"], "未配置户籍筛选")
     if parsed["mode"] == "none":
         return _row("hukou", "unknown", "", "JD未注明户籍要求")
-    have = {_norm_city(str(place)) for place in (section.get("has") or [])}
+    def normalize(place):
+        value = str(place).strip().removesuffix("籍")
+        return _HUKOU_SHORT_PLACES.get(value, _norm_city(value))
+
+    have = {normalize(place) for place in (section.get("has") or [])}
     job_cities = [city for city in cities if city not in {"远程", "全国", "不限"}]
 
     def holds(place: str) -> bool:
@@ -1481,7 +1724,7 @@ def _eval_hukou(parsed: dict, cities: list, filters: dict) -> dict:
     if parsed["mode"] == "preferred":
         return _row("hukou", "flag", parsed["evidence"], f"优先户籍：{'、'.join(parsed['places'])}", ["hukou_preferred"])
     missing = [place for place in parsed["places"] if not holds(place)]
-    if not missing:
+    if not missing or (parsed["mode"] == "alternatives" and len(missing) < len(parsed["places"])):
         return _row("hukou", "pass", parsed["evidence"], f"户籍匹配：{'、'.join(parsed['places'])}")
     reject = bool(section.get("reject_if_required", True))
     status = "fail" if reject else "flag"
@@ -1525,7 +1768,13 @@ def _eval_salary_thresholds(parsed: dict, filters: dict) -> dict:
     if not section:
         return _row("salary", "unknown", parsed["evidence"], "未配置薪资底线")
     floor = _number(section, "min_monthly_k") if "min_monthly_k" in section else None
+    if parsed["annual"] and section.get("compare_annual_as_monthly", True) is False:
+        floor = None
     min_months = _number(section, "min_months") if "min_months" in section else None
+    if (parsed["annual"] and section.get("compare_annual_as_monthly", True) is False
+            and (min_months is None or parsed["months"] is None)):
+        return _row("salary", "unknown", parsed["evidence"],
+                    "已关闭年包月均与月薪底线比较；年包不等于保证月薪")
     if parsed["min_monthly_k"] is None and parsed["months"] is None:
         evidence = parsed["evidence"] or ""
         detail = "薪资未注明，需确认" if not evidence else f"薪资未注明，需确认 ({evidence})"
@@ -1572,6 +1821,9 @@ def _thresholds(filters: dict) -> dict:
         "campus_mode": _section(filters, "campus").get("mode", "auto"),
         "graduation_year": _section(filters, "campus").get("graduation_year"),
         "candidate_is_student": _labor_student(filters),
+        "availability": dict(_section(filters, "availability")),
+        "min_annual_total_k": salary.get("min_annual_total_k"),
+        **_round5_settings(filters),
     }
 
 
@@ -1595,6 +1847,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         source = "custom"
     if not isinstance(filters, dict):
         raise ValueError("filters must be a dict")
+    settings = _round5_settings(filters)
     folded = fold(text)
     known = _known_cities(filters)
     degree = parse_degree(folded)
@@ -1604,10 +1857,11 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
     hukou = parse_hukou(folded, known)
     salary = parse_salary(folded, text)
     campus = parse_campus(folded, filters)
+    availability = parse_availability(folded)
     # Jargon and scam phrases are case-insensitive ("Base + 期权").
     # Salary evidence is sliced from the pasted text, which fold() does not resize.
     lowered = folded.lower()
-    jargon = find_jargon(lowered)
+    jargon = find_jargon(lowered, settings["flexible_work_overtime_only"])
     lure = find_lure(lowered)
     jargon.extend({"phrase": item["phrase"], "penalty": item["penalty"]} for item in lure)
     scams = find_scams(lowered)
@@ -1623,6 +1877,8 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         _eval_hukou(hukou, cities, filters),
         _eval_salary(salary, filters),
         *_eval_campus(campus, filters),
+        *_eval_availability(availability, campus, filters),
+        *_eval_annual_total(folded, filters),
         _labor_row(labor),
     ]
     if source == "example":
@@ -1675,6 +1931,9 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
             "hukou": hukou,
             "salary": salary,
             "campus": campus,
+            "availability": availability,
+            "employer": parse_employer(folded, settings["detect_self_description"]),
+            "working_hours": parse_working_hours(folded),
         },
         "thresholds": _thresholds(filters),
         "thresholds_source": source,
