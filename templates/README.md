@@ -1,6 +1,8 @@
 # Custom Templates
 
-This folder holds user-registered templates (LaTeX, Typst, or any other toolchain with a declared compile command), managed by the `/add-template` command. The framework works out of the box with its stock templates (moderncv for CVs, `cover.cls` for cover letters) — this folder only gets content when you register your own.
+This folder holds user-registered templates (LaTeX, Typst, or any other toolchain with a declared compile command), managed by the `/add-template` command. The framework works out of the box with its stock templates (moderncv for CVs, `cover.cls` for cover letters).
+
+`templates/cn/` is the exception: a shipped one-page Chinese résumé (ctex / xeCJK, optional photo, example marked 虚构). It is not registered through `/add-template`. `/apply` selects it when the CV language is Chinese and no custom template is active. See `templates/cn/README.md`. The `cv/` and `cover_letters/` layout below is only for templates you register yourself.
 
 ## Layout
 

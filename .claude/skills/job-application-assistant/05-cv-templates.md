@@ -1,5 +1,5 @@
 ---
-framework_version: 1.4.7
+framework_version: 1.4.9
 ---
 
 # CV Templates and Tailoring Guide
@@ -8,7 +8,7 @@ framework_version: 1.4.7
 
 ## Template: LaTeX moderncv (Banking Style)
 
-All CVs use the moderncv LaTeX package with the "banking" style and "blue" color scheme.
+The default CV uses the moderncv LaTeX package with the "banking" style and "blue" color scheme. The one-page Chinese résumé in the next section does not use moderncv.
 
 **Output file:** `cv/main_<company>_<role>.tex`
 **Compile with:** **lualatex** on MiKTeX/TeX Live. pdflatex often fails on modern MiKTeX installs with `fontawesome5` font-expansion errors; lualatex handles the same sources cleanly.
@@ -20,7 +20,22 @@ All CVs use the moderncv LaTeX package with the "banking" style and "blue" color
 cd cv && lualatex -interaction=nonstopmode main_<company>_<role>.tex
 ```
 
-Expected output: `Output written on main_<company>_<role>.pdf (2 pages, ...)`. Any page count other than 2 is a failure that must be fixed before presenting to the user.
+Expected output: `Output written on main_<company>_<role>.pdf (2 pages, ...)`. For this moderncv template, any page count other than 2 is a failure that must be fixed before presenting to the user. The Chinese résumé below is exactly 1 page instead.
+
+## Chinese one-page résumé (`templates/cn/`)
+
+Not the default. `/apply` selects it only when no `ACTIVE-TEMPLATE` block is active and the profile's `CV language` is 中文 (`Chinese` or `zh` also count), or when the user asks for the one-page Chinese résumé in that turn. A registered custom template wins.
+
+- **Skeleton:** `templates/cn/resume.tex`, copied to `cv/main_<company>_<role>.tex`. Macros live in `templates/cn/cnresume.sty`. Read `templates/cn/README.md` before drafting.
+- **Engine:** **xelatex**. The class is `ctexart` with `fontset=none`, which loads xeCJK. Do not compile it with pdflatex or lualatex, and do not pass `-shell-escape`. `cnresume.sty` embeds Noto CJK when that font is installed, because pypdf can read it. Fandol is the fallback and pypdf garbles its Chinese text layer; install Noto and recompile rather than rewriting bullets to match the garbage.
+- **Page limit:** exactly 1. Content limits are in the folder README. Cut to fit; do not drop below `\zihao{5}` or 12mm margins.
+- **Photo:** off unless the preamble calls `\cnphoto{<file>}`. Never invent a portrait. Never commit the image.
+- **`templates/cn/example.tex` is 虚构.** Layout only. Not a person, not a fact source. Do not copy its employers, dates, or numbers.
+- **Dates** in the date argument use one ASCII hyphen (`2022.04-2026.03`), the same rule as "Date fields must be ASCII ranges" below.
+- **Section headings** stay in Chinese. JDs are pasted by hand. This template does not fetch a job site and does not submit or greet anyone.
+- **Layout check:** `verify_layout.py`'s 90pt footer band is calibrated for moderncv. A full one-page résumé can report a false footer collision. Do not widen the bottom margin or cut content to silence that one report. `--pages 1` plus a visual read are the checks. A hole over 100pt is still real.
+
+Grounding, relevance-weighted cutting, keyword honesty, in-progress credentials, and the special-character escapes later in this file still apply. The 2-page moderncv budget does not.
 
 ## Document Structure
 
@@ -241,7 +256,7 @@ Related trap: a bullet whose text begins with a literal `[` must be braced - `\i
 
 ## Compile-and-Inspect Loop (MANDATORY)
 
-After writing the CV and before presenting to the user, always compile and visually inspect the PDF. Iterate until the layout is clean. Workflow:
+After writing the CV and before presenting to the user, always compile and visually inspect the PDF. Iterate until the layout is clean. The steps below are the moderncv default (lualatex, exactly 2 pages). When the Chinese one-page résumé is selected, compile with the xelatex command in `templates/cn/README.md` and require exactly 1 page instead. Workflow:
 
 1. Run `lualatex -interaction=nonstopmode main_<company>_<role>.tex`
 2. Check the output page count: must be exactly 2
@@ -314,7 +329,9 @@ Two independent causes, both easy to avoid:
 
 ## Page Budget - Hard 2-Page Limit
 
-The CV **must** fit on exactly 2 pages when compiled. Use these content limits as a guide:
+This budget is the moderncv default. The Chinese one-page résumé (`templates/cn/`) is exactly 1 page; use the limits in `templates/cn/README.md` for that file only.
+
+The moderncv CV **must** fit on exactly 2 pages when compiled. Use these content limits as a guide:
 
 | Section | Max budget |
 |---------|-----------|

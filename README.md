@@ -193,8 +193,9 @@ ai-job-search/
 │   ├── cover.cls                      # Custom cover letter LaTeX class
 │   ├── cover_example.tex              # Example cover letter (structural reference + CI smoke test)
 │   └── OpenFonts/                     # Lato + Raleway fonts
-├── templates/                         # Custom templates registered via /add-template
-│   └── README.md                      # Folder layout instructions
+├── templates/                         # /add-template registrations, plus templates/cn/
+│   ├── README.md                      # Folder layout instructions
+│   └── cn/                            # One-page Chinese résumé (ctex/xeCJK; example is 虚构)
 ├── documents/                         # Career source materials for /setup Path A and /expand
 │   ├── README.md                      # Folder layout instructions
 │   ├── cv/                            # Master CV (PDF or .tex)
@@ -384,3 +385,5 @@ MIT
 本仓库（jobpilot-cn）是上游项目 [ai-job-search](https://github.com/MadsLorentzen/ai-job-search) 的中文本地化分支。上游作者为 [Mads Lorentzen](https://github.com/MadsLorentzen)，许可证为 MIT。本仓库保留上游 `LICENSE` 原文，不另行替换或删改。
 
 本分支面向中国招聘平台：Boss直聘、智联、拉勾、猎聘。这里没有爬虫，也不会自动投递。职位描述（JD）由使用者手工粘贴，再进入匹配评估以及简历、求职信的撰写流程。
+
+一页中文简历在 `templates/cn/`（ctex / xeCJK，用 xelatex 编译，照片开关默认关闭）。`example.tex` 标明**虚构**，不是真人，不能当作事实来源。档案里的 CV language 为中文，且没有用 `/add-template` 激活别的模板时，`/apply` 用这份骨架起草，页数是 1 页，而不是 moderncv 的 2 页。模板本身不抓取招聘网站，也不自动打招呼或投递。

@@ -15,6 +15,8 @@ per-file diff commands.
 
 ### Added
 
+- **One-page Chinese résumé** (`templates/cn/`, `.claude/commands/apply.md`, `05-cv-templates.md`) - a ctex/xeCJK résumé compiled with xelatex, photo off unless `\cnphoto` is set, plus `example.tex` marked 虚构. `/apply` drafts from it when the CV language is Chinese and no custom template is active; the page limit is then 1, not the moderncv 2. Stock moderncv is unchanged otherwise. Job descriptions stay pasted by hand. The template does not scrape or submit.
+
 - **CI runs the Python suite on Windows** (`.github/workflows/ci.yml` `python-tests-windows`) - every
   job ran on Ubuntu, so a Windows-only failure reached master with all checks green: #480's test
   (an atomic rename that Windows file locking refuses) and #486's (a tool printing non-ASCII JSON

@@ -1,0 +1,60 @@
+%% 虚构示例。不是真人。不要投递，不要当作事实来源。
+%% 人物、公司、学校、电话、邮箱和数字都是编的。版式演示用。
+%% 引擎：xelatex（ctexart / xeCJK）。fontset=none，字体由 cnresume.sty 选择。
+%% 照片开关保持关闭。
+\documentclass[a4paper,fontset=none,zihao=5]{ctexart}
+\usepackage{cnresume}
+
+% 虚构示例不放照片。真实简历若要照片，在自己的副本里写 \cnphoto{photo.jpg}。
+% \cnphoto{photo.jpg}
+
+\hypersetup{
+  pdftitle={林示意（虚构）},
+  pdfauthor={林示意（虚构）},
+  pdfsubject={虚构示例，请勿投递},
+}
+
+\begin{document}
+
+\cnheader{林示意（虚构）}{后端工程师 · 北京 · 可立即到岗}{%
+  138-0000-0000\quad
+  \href{mailto:shiyi.lin@example.com}{shiyi.lin@example.com}\quad
+  \href{https://example.com/shiyi}{example.com/shiyi}%
+}
+
+\cnnotice{虚构示例。林示意不是真人，公司、学校、电话、邮箱和下文数字都是编的，请勿投递。}
+
+\cnsection{个人简介}
+\cnprofile{虚构的后端工程师，用来展示一页中文简历怎么排。做过检索接口和发布工具。下面每一家公司和每一个数字都不是真实经历，只能当版式参考。}
+
+\cnsection{专业技能}
+\cnskill{语言：}{Python、Go、SQL}
+\cnskill{后端：}{HTTP 服务、PostgreSQL、Redis、Linux}
+\cnskill{工程：}{单元测试、持续集成、代码评审、告警}
+
+\cnsection{工作经历}
+\cnrole{2022.04-2026.03}{后端工程师}{示意云计算（北京）有限公司}{北京}
+\begin{itemize}
+  \item 重写内部检索的查询接口。虚构指标：p95 从 800ms 降到 120ms。
+  \item 把发布收成一条命令。虚构节奏：每周发布从 2 次变成 8 次。
+  \item 给三个服务补上集成测试和告警，当周能看见故障。此条同样是虚构的。
+\end{itemize}
+
+\cnrole{2019.07-2022.03}{软件工程师}{北境示例数据}{上海}
+\begin{itemize}
+  \item 维护订单只读接口。虚构结果：错误率降到原来的三分之一。
+  \item 写过一本值班手册，新人可以独自跟一条告警。公司与手册都不存在。
+\end{itemize}
+
+\cnsection{项目经历}
+\cnproject{示意日志平台}{2023.01-2023.11}{个人练习，没有上线，没有用户}
+\begin{itemize}
+  \item 用 Go 写了一个只在本机跑的日志过滤小工具，用来占项目这一节的位置。
+  \item 过滤规则写在一个文本文件里。没有客户，也没有线上数据。
+\end{itemize}
+
+\cnsection{教育背景}
+\cnedu{2015-2019}{计算机科学与技术，学士}{示意理工大学}{杭州}
+\cnprofile{毕业论文也是虚构的：一份教学用的键值存储，没有发表。}
+
+\end{document}

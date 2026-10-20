@@ -1,0 +1,59 @@
+%% jobpilot-cn 一页中文简历骨架。占位符，不是真人。
+%% 引擎：xelatex。文档类 ctexart 会载入 xeCJK。不要用 pdflatex 或 lualatex。
+%% fontset=none：cnresume.sty 优先 Noto CJK（pypdf 能抽出中文），没有则用 Fandol。
+%% 复制到 cv/main_<company>_<role>.tex 后再替换方括号占位符。
+%% 不要把 example.tex 里的虚构经历抄进来。职位描述手贴。不抓取，不自动投递。
+%% 编译命令见 README.md。照片默认关闭。
+\documentclass[a4paper,fontset=none,zihao=5]{ctexart}
+\usepackage{cnresume}
+
+% 需要证件照时取消下一行注释，图片与本文件同目录，且不要提交。
+% \cnphoto{photo.jpg}
+
+\hypersetup{
+  pdftitle={姓名},
+  pdfauthor={姓名},
+  pdfsubject={Resume},
+}
+
+\begin{document}
+
+\cnheader{[姓名]}{[求职意向] · [城市]}{%
+  [电话]\quad
+  \href{mailto:[邮箱]}{[邮箱]}\quad
+  \href{[链接]}{[链接]}%
+}
+
+\cnsection{个人简介}
+\cnprofile{[简介：两到三行，只写档案里已有的事实，并针对这一份手贴的职位。]}
+
+\cnsection{专业技能}
+\cnskill{语言：}{[语言与技术栈]}
+\cnskill{后端：}{[后端工具]}
+\cnskill{工程：}{[工程实践]}
+
+\cnsection{工作经历}
+\cnrole{[开始]-[结束]}{[职位]}{[公司]}{[城市]}
+\begin{itemize}
+  \item {[成果：一条档案里有的结果。日期用单个 ASCII 连字符，不要用下划线。]}
+  \item {[成果]}
+  \item {[成果]}
+\end{itemize}
+
+\cnrole{[开始]-[结束]}{[职位]}{[公司]}{[城市]}
+\begin{itemize}
+  \item {[成果]}
+  \item {[成果]}
+\end{itemize}
+
+\cnsection{项目经历}
+\cnproject{[项目]}{[开始]-[结束]}{[项目背景]}
+\begin{itemize}
+  \item {[成果]}
+  \item {[成果]}
+\end{itemize}
+
+\cnsection{教育背景}
+\cnedu{[开始]-[结束]}{[学位]}{[学校]}{[城市]}
+
+\end{document}

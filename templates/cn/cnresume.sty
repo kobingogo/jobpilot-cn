@@ -1,0 +1,169 @@
+% One-page Chinese résumé layout for jobpilot-cn.
+% Compile with xelatex. ctexart loads xeCJK; this package refuses other engines.
+% Load ctexart with fontset=none: this file picks the CJK font.
+% Photo is off until the preamble calls \cnphoto{<file>}.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{cnresume}[2026/10/20 jobpilot-cn one-page Chinese resume]
+
+\RequirePackage{iftex}
+\RequireXeTeX
+
+\@ifpackageloaded{xeCJK}{}{%
+  \PackageError{cnresume}{xeCJK is not loaded. Use xelatex and \string\documentclass{ctexart}}{}%
+}
+\@ifundefined{zihao}{%
+  \PackageError{cnresume}{ctex is required. Load ctexart before cnresume}{}%
+}{}
+
+% Noto CJK embeds a ToUnicode map, so pypdf (the extractor /apply tries first)
+% reads the Chinese text layer. Fandol, ctex's usual default, compiles from
+% texlive-lang-chinese alone but pypdf returns mojibake for the same page.
+% fontconfig name, not a kpathsea filename: Fandol is not visible to \IfFontExistsTF.
+\IfFontExistsTF{Noto Serif CJK SC}{%
+  \setCJKmainfont{Noto Serif CJK SC}[BoldFont={Noto Serif CJK SC Bold}]%
+  \setCJKsansfont{Noto Sans CJK SC}[BoldFont={Noto Sans CJK SC Bold}]%
+  \setCJKmonofont{Noto Sans CJK SC}%
+  \setCJKfamilyfont{zhsong}{Noto Serif CJK SC}[BoldFont={Noto Serif CJK SC Bold}]%
+  \setCJKfamilyfont{zhhei}{Noto Sans CJK SC}[BoldFont={Noto Sans CJK SC Bold}]%
+}{%
+  \PackageWarning{cnresume}{%
+    Noto Serif CJK SC was not found. Falling back to Fandol.\MessageBreak
+    The page still compiles, but pypdf cannot read Fandol's Chinese text layer.\MessageBreak
+    Install fonts-noto-cjk and recompile. Do not rewrite the resume to match the garbage%
+  }%
+  \setCJKmainfont{FandolSong-Regular.otf}[%
+    BoldFont=FandolSong-Bold.otf,%
+    ItalicFont=FandolKai-Regular.otf%
+  ]%
+  \setCJKsansfont{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]%
+  \setCJKmonofont{FandolFang-Regular.otf}%
+  \setCJKfamilyfont{zhsong}{FandolSong-Regular.otf}[%
+    BoldFont=FandolSong-Bold.otf%
+  ]%
+  \setCJKfamilyfont{zhhei}{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]%
+}
+
+\RequirePackage{geometry}
+\RequirePackage{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{enumitem}
+\RequirePackage{hyperref}
+
+\geometry{
+  a4paper,
+  left=14mm,
+  right=14mm,
+  top=12mm,
+  bottom=14mm,
+}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\emergencystretch=3em
+
+\definecolor{cnaccent}{HTML}{1F4E79}
+\definecolor{cnmuted}{HTML}{4A5560}
+\definecolor{cnfictional}{HTML}{8C1D18}
+
+% Non-empty Info fields: some Poppler builds abort on an empty hyperref string.
+\hypersetup{
+  colorlinks=true,
+  urlcolor=cnaccent,
+  linkcolor=cnaccent,
+  pdfpagemode=UseNone,
+  pdftitle={Chinese resume},
+  pdfauthor={Chinese resume},
+  pdfsubject={Chinese resume},
+}
+\urlstyle{same}
+
+\setlist[itemize]{%
+  nosep,
+  leftmargin=1.35em,
+  topsep=1pt,
+  itemsep=1.5pt,
+  parsep=0pt,
+  label={\color{cnaccent}\textbullet},
+}
+
+\newif\ifcnphoto
+\cnphotofalse
+\newcommand{\cnphotofile}{}
+% Turn the photo on from the preamble: \cnphoto{photo.jpg}
+% The image stays beside the source and is not committed.
+\newcommand{\cnphoto}[1]{%
+  \cnphototrue
+  \renewcommand{\cnphotofile}{#1}%
+}
+
+% #1 name  #2 target line  #3 contact line (literal phone and email)
+\newcommand{\cnheader}[3]{%
+  \par\noindent
+  \begin{minipage}[c]{\ifcnphoto\dimexpr\linewidth-2.9cm\relax\else\linewidth\fi}
+    \raggedright
+    {\zihao{2}\bfseries #1}\par
+    \vspace{3pt}%
+    {\zihao{-4}\color{cnaccent}#2}\par
+    \vspace{3pt}%
+    {\zihao{-5}#3}\par
+  \end{minipage}%
+  \ifcnphoto
+    \hfill
+    \begin{minipage}[c]{2.6cm}
+      \raggedleft
+      \IfFileExists{\cnphotofile}{%
+        \includegraphics[width=2.4cm,height=3.2cm,keepaspectratio]{\cnphotofile}%
+      }{%
+        \PackageError{cnresume}{Photo toggle is on but `\cnphotofile' was not found}{%
+          Put the image next to the source, or delete \string\cnphoto.}%
+      }%
+    \end{minipage}%
+  \fi
+  \par\vspace{5pt}%
+  {\color{cnaccent}\hrule height 0.7pt}\par
+}
+
+% Visible banner. The fictional example uses it. A real résumé does not.
+\newcommand{\cnnotice}[1]{%
+  \par\vspace{3pt}{\zihao{-5}\color{cnfictional}#1}\par
+}
+
+\newcommand{\cnsection}[1]{%
+  \par\vspace{7pt}%
+  {\zihao{-4}\bfseries\color{cnaccent}#1}\par
+  \vspace{1pt}{\color{cnaccent}\hrule height 0.35pt}\par
+  \vspace{2pt}%
+}
+
+\newcommand{\cnprofile}[1]{%
+  \par\noindent #1\par
+}
+
+% #1 label  #2 value. Single column so the text layer stays in reading order.
+\newcommand{\cnskill}[2]{%
+  \par\vspace{1pt}\noindent{\bfseries #1}\quad #2\par
+}
+
+% #1 dates (one ASCII hyphen, never --)  #2 title  #3 organization  #4 location
+\newcommand{\cnrole}[4]{%
+  \par\vspace{4pt}%
+  \noindent{\bfseries #2}\hfill #1\par
+  \vspace{1pt}%
+  \noindent{\color{cnmuted}#3·#4}\par
+}
+
+% #1 name  #2 dates  #3 one-line context (may be empty)
+\newcommand{\cnproject}[3]{%
+  \par\vspace{4pt}%
+  \noindent{\bfseries #1}\hfill #2\par
+  \if\relax\detokenize{#3}\relax\else
+    \vspace{1pt}%
+    \noindent{\color{cnmuted}#3}\par
+  \fi
+}
+
+% #1 dates  #2 degree  #3 school  #4 location
+\newcommand{\cnedu}[4]{%
+  \par\vspace{2pt}%
+  \noindent{\bfseries #2}\quad #3\quad{\color{cnmuted}#4}\hfill #1\par
+}

@@ -93,11 +93,13 @@ Read only the reference files you do not yet have:
 
 **Resolve the active template (do this once, reuse everywhere below):** if `05-cv-templates.md` or `06-cover-letter-templates.md` opens with an `ACTIVE-TEMPLATE` managed block (inserted by `/add-template`), read its declared **source extension** and **compile command** — these override the stock `.tex`/lualatex (CV) and `.tex`/xelatex (cover letter) defaults for the rest of this workflow. Call these `<CV_EXT>`/`<CV_COMPILE>` and `<COVER_EXT>`/`<COVER_COMPILE>`; where no block is present, they default to `.tex`, the stock lualatex command, and the stock xelatex command respectively. Every `.tex` reference below is really `<CV_EXT>` or `<COVER_EXT>` — stock behavior is unchanged, this only matters when a custom template is active.
 
+**Chinese one-page résumé (`templates/cn/`):** if no `ACTIVE-TEMPLATE` block is present and the profile's `CV language` is 中文 (`Chinese` and `zh` count), or the user asks in this turn for the one-page Chinese résumé, draft the CV from `templates/cn/resume.tex` instead of moderncv. Read `templates/cn/README.md` and the Chinese section of `05-cv-templates.md` first. Then `<CV_EXT>` stays `.tex`, `<CV_COMPILE>` is the xelatex command in that README (ctex/xeCJK, not lualatex), and the CV page limit is exactly 1. An `ACTIVE-TEMPLATE` block still wins. `templates/cn/example.tex` is a 虚构 layout sample, not a person and not a fact source: do not copy its employers, dates, or numbers. Leave `\cnphoto` commented out unless the profile or the user turns the photo on; never invent a portrait and never commit the image. The cover letter does not change: posting language, `cover.cls` or the active cover template, exactly 1 page. The posting is still pasted by hand. This template does not scrape job sites and does not greet or submit.
+
 Also read the most recent existing CV and cover letter files for concrete structural reference (one of each is enough):
 - Read any existing `cv/main_*<CV_EXT>` file as a structural reference
 - Read any existing `cover_letters/cover_*<COVER_EXT>` or `cover_letters/Cover_*<COVER_EXT>` file as a structural reference
 
-*The master candidate profile (`01-candidate-profile.md`), the master CV (`cv/main_example.tex`), and CLAUDE.md's Candidate Profile section are the sole source of truth for facts; existing tailored CVs may be read for structure and phrasing only, never as a source of claims.*
+*The master candidate profile (`01-candidate-profile.md`), the master CV (`cv/main_example.tex`), and CLAUDE.md's Candidate Profile section are the sole source of truth for facts; existing tailored CVs may be read for structure and phrasing only, never as a source of claims. `templates/cn/example.tex` is 虚构 and is not a source of claims.*
 
 ### Requirement coverage (both documents)
 - **Every requirement the posting states gets addressed - matched or honestly gapped, never silently omitted.** A stated requirement the candidate lacks (a tool, a clearance, years of experience) is acknowledged with an honest bridge ("not in my daily toolkit yet; a natural extension of X"), because omission reads as hiding once an interviewer asks. Build the requirement list from Step 1 and check both drafts against it before Step 3.
@@ -108,11 +110,11 @@ Also read the most recent existing CV and cover letter files for concrete struct
 
 ### CV (`cv/main_<company>_<role><CV_EXT>`)
 - In the **CV language from the profile** (the `CV language:` line in CLAUDE.md's Identity section). When the profile does not set one, default to **English**. Never switch language per posting - the CV language is a profile-level choice, so all CVs stay consistent and reusable
-- Follow the moderncv/banking format from `05-cv-templates.md`
+- If the Chinese one-page résumé was selected above, copy `templates/cn/resume.tex` to this path, keep the photo line commented out unless a photo was requested, and replace the bracket placeholders from the profile. Section headings stay in Chinese. Otherwise follow the moderncv/banking format from `05-cv-templates.md`
 - Tailor the profile statement and experience bullets to the specific role
 - Reframe skills and achievements to match job requirements
-- Keep to 2 pages
-- **Grounding Audit:** Before writing to disk, audit all tailored bullet points against the union of three sources: `.claude/skills/job-application-assistant/01-candidate-profile.md` + the master CV (`cv/main_example.tex`) + `CLAUDE.md`'s Candidate Profile section to verify that all dates, roles, and metrics match exactly (zero profile drift or fabrication).
+- Keep to 2 pages, or exactly 1 page when the Chinese one-page résumé was selected. Do not copy wording from `templates/cn/example.tex`
+- **Grounding Audit:** Before writing to disk, audit all tailored bullet points against the union of three sources: `.claude/skills/job-application-assistant/01-candidate-profile.md` + the master CV (`cv/main_example.tex`) + `CLAUDE.md`'s Candidate Profile section to verify that all dates, roles, and metrics match exactly (zero profile drift or fabrication). The 虚构 file `templates/cn/example.tex` is not one of the three sources.
 
 ### Cover Letter (`cover_letters/cover_<company>_<role><COVER_EXT>`)
 - **Match the language of the job posting** (Danish posting -> Danish cover letter, English posting -> English cover letter)
@@ -164,7 +166,7 @@ Read these reference files — and only these — to ground your critique:
 Do NOT read `05-cv-templates.md` or `06-cover-letter-templates.md` — those govern template structure the drafter already applied and are not needed for content critique.
 
 ### 3. Factual Grounding Audit
-Compare every date, employer, job title, and quantitative metric in both drafts against the union of three sources: `.claude/skills/job-application-assistant/01-candidate-profile.md` + the master CV baseline template (`cv/main_example.tex`) + `CLAUDE.md`'s Candidate Profile section. A claim is grounded if ANY of these sources supports it. Mismatches between these three sources themselves must be reported to the user as a profile-consistency warning rather than treated as draft drift. Draft mismatches must be flagged as Part A edits with `"reason": "grounding"` so they can be distinguished from style changes. Keep the tolerance honest: reframed emphasis is fine; changed facts and escalated numbers are not.
+Compare every date, employer, job title, and quantitative metric in both drafts against the union of three sources: `.claude/skills/job-application-assistant/01-candidate-profile.md` + the master CV baseline template (`cv/main_example.tex`) + `CLAUDE.md`'s Candidate Profile section. A claim is grounded if ANY of these sources supports it. `templates/cn/example.tex` is 虚构 and is not a fourth source; do not propose moving its employers, dates, or numbers into the draft. If the orchestrator selected `templates/cn/`, a one-page Chinese résumé is the requested shape: do not demand moderncv or a second page. Mismatches between these three sources themselves must be reported to the user as a profile-consistency warning rather than treated as draft drift. Draft mismatches must be flagged as Part A edits with `"reason": "grounding"` so they can be distinguished from style changes. Keep the tolerance honest: reframed emphasis is fine; changed facts and escalated numbers are not.
 
 ### 4. Drafts to Review
 Both drafts are provided inline below. Do NOT use the Read tool on the draft files — use these exact texts.
@@ -248,6 +250,7 @@ cd ../cover_letters && xelatex -interaction=nonstopmode cover_<company>_<role>.t
 - **Stock CV** uses **lualatex** — pdflatex fails on modern MiKTeX with fontawesome5 font-expansion errors. lualatex handles the same sources cleanly.
 - **Stock cover letter** uses **xelatex** — cover.cls requires fontspec.
 - **Custom template active:** run its declared `<CV_COMPILE>`/`<COVER_COMPILE>` command instead, substituting the actual filename for `<file>`. Never fall back to lualatex/xelatex when a custom template's compile command is a different toolchain (e.g. `typst compile`) — that command is what the manifest actually verified in `/add-template` Step 4.
+- **Chinese one-page résumé selected in Step 2:** compile the CV with the xelatex `<CV_COMPILE>` from `templates/cn/README.md` (ctex/xeCJK, `fontset=none`). Do not compile that CV with lualatex. The cover-letter compile line stays as it is. `cnresume.sty` embeds Noto CJK when installed so pypdf can read the Chinese text layer; Fandol is the fallback and pypdf garbles it. If extraction is mojibake while the page looks right, install Noto CJK and recompile. Do not rewrite bullets to match the garbage.
 
 If either compile fails, fix the error and re-compile until clean.
 
@@ -262,7 +265,7 @@ python tools/verify_layout.py cv/main_<company>_<role>.pdf
 python tools/verify_layout.py cover_letters/cover_<company>_<role>.pdf
 ```
 
-The two `--pages` lines are the page-count check: exactly 2 pages for the CV and exactly 1 for the cover letter (the hard limits in `05-cv-templates.md` and `06-cover-letter-templates.md`), exit 1 otherwise. With a custom template active, substitute its declared **Page limit** from the `ACTIVE-TEMPLATE` block. Nothing else runs this check - `verify_layout.py` deliberately leaves page count to it, and Step 5d's extraction call passes no `--pages` - so if these lines are skipped, the page budget is enforced by nothing but the visual read below.
+The two `--pages` lines are the page-count check: exactly 2 pages for the CV and exactly 1 for the cover letter (the hard limits in `05-cv-templates.md` and `06-cover-letter-templates.md`), exit 1 otherwise. With a custom template active, substitute its declared **Page limit** from the `ACTIVE-TEMPLATE` block. When Step 2 selected the Chinese one-page résumé, the CV limit is exactly 1 page: pass `--pages 1` on `cv/main_<company>_<role>.pdf` instead of `--pages 2`, and do not also require 2 pages. `verify_layout.py`'s 90pt footer band is calibrated for moderncv, so a full one-page résumé can report a false footer collision; do not widen the bottom margin or cut content to silence that report. A hole over 100pt is still real. Judge that CV by the 1-page count and by reading the PDF. Nothing else runs the page-count check - `verify_layout.py` deliberately leaves page count to `verify_pdf.py --pages`, and Step 5d's extraction call passes no `--pages` - so if these lines are skipped, the page budget is enforced by nothing but the visual read below.
 
 The layout script reports, per page, where the text starts and stops, bottom whitespace as a share of page height, and the largest vertical gap between lines. It exits 1 on: a hole over 100pt (~7 blank lines), a non-final page ending more than 25% early, body text colliding with the page-number footer, a final page more than 35% empty, and an entry header or section heading stranded at a page break. Page count is **not** checked here — that is `verify_pdf.py --pages`'s job, and the two `--pages` lines above run it.
 
@@ -275,7 +278,7 @@ The thresholds are calibrated for the stock moderncv and `cover.cls` geometry; a
 Then read both PDFs via the Read tool and verify:
 
 **CV (`cv/main_<company>_<role>.pdf`):**
-- [ ] Exactly 2 pages (not 1, not 3)
+- [ ] Exactly 2 pages (not 1, not 3), or exactly 1 page when Step 2 selected the Chinese one-page résumé
 - [ ] No orphaned `\cventry` titles — a job/education title line must never sit alone at the bottom of page 1 with its bullets on page 2. This is the most common failure.
 - [ ] Section headings are not isolated at the top of page 2 with only 1-2 lines below
 - [ ] No awkward whitespace gaps
@@ -291,6 +294,7 @@ If the layout has problems, edit the source files (`<CV_EXT>`/`<COVER_EXT>`) and
 
 - **Orphaned CV entry title:** `\usepackage{needspace}` in preamble, then `\needspace{5\baselineskip}` immediately before the problematic `\cventry`
 - **CV spills to page 3 with only a trailing section:** `\enlargethispage{2-3\baselineskip}` before a late section
+- **Chinese one-page résumé spills onto page 2:** cut content (a project bullet, then an older-role bullet) using the same relevance-weighted cutting. Do not drop below `\zihao{5}` or 12mm margins, and do not treat a `verify_layout.py` footer-collision report as overflow.
 - **Substantial content on page 3:** cut content using **relevance-weighted cutting** (see `05-cv-templates.md` → "Relevance-weighted cutting"). Score each candidate line by (a) relevance to THIS posting's keywords and responsibilities, (b) uniqueness (is it duplicated elsewhere?), (c) narrative load (does the cover letter depend on it?). Cut the lowest-total-score line first, regardless of section. Do NOT mechanically apply a static section-based priority order — an older-role bullet that hits posting keywords is worth more than a recent-role bullet that does not.
 - **Cover letter itemize breaks compile or uses wrong font:** close `\lettercontent{}` before the list, wrap the list in `{\raggedright\fontspec[Path = OpenFonts/fonts/raleway/]{Raleway-Medium}\fontsize{11pt}{13pt}\selectfont \begin{itemize}...\end{itemize}\par}`
 - **Cover letter spills to 2 pages:** trim using the same relevance-weighted logic. First cut: sentences that restate what a bullet already said. Second cut: a bullet that does not hit posting keywords. Last resort: a bullet that does hit posting keywords. Never reduce geometry or line spacing.
