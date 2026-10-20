@@ -32,7 +32,8 @@ v1 preps for a **specific application**. Generic no-target practice is out of sc
    - `.claude/skills/job-application-assistant/01-candidate-profile.md`
    - `.claude/skills/job-application-assistant/02-behavioral-profile.md`
    - `.claude/skills/job-application-assistant/04-job-evaluation.md`
-   - `docs/cn/面试准备.md` when this is a Chinese role: the posting language is Chinese, the profile `CV language` is 中文 (`Chinese` or `zh` also count), the user asked for a 中文面试, or this application used `templates/cn/`. It adds 自我介绍, 离职原因, 薪资谈判, and 群面/无领导小组讨论. Its 虚构 examples are not facts. Do not scrape, greet, or apply. The posting stays pasted by hand.
+   - For a Chinese campus/intern profile (`Career stage: campus / intern`, 校招/实习; or confirmed 在读/应届 when stage is missing), read `docs/cn/校招实习面试准备.md` as the student branch. Use projects/internships/campus evidence, not assumed current employment or salary. Confirm missing stage/status rather than inferring enrollment from a JD. Active CV templates do not override this interview routing.
+   - `docs/cn/面试准备.md` for other Chinese profiles when this is a Chinese role: the posting language is Chinese, the profile `CV language` is 中文 (`Chinese` or `zh` also count), the user asked for a 中文面试, or this application used `templates/cn/`. It adds 自我介绍, 离职原因, 薪资谈判, and 群面/无领导小组讨论. Its 虚构 examples are not facts. Do not scrape, greet, or apply. The posting stays pasted by hand.
 
 ---
 
@@ -53,7 +54,7 @@ Additions for interview purposes:
 
 ## Step 3: Build the Prep Pack
 
-Assemble a stage-appropriate prep document with these sections. For a Chinese role (the same test as Step 1), also add the four blocks from `docs/cn/面试准备.md`, filled only from the profile and the submitted CV and cover letter. Do not copy that file's 虚构 examples. Skip the four blocks otherwise.
+Assemble a stage-appropriate prep document with these sections. For a Chinese role (the same test as Step 1), use the guide selected in Step 1. For campus/intern profiles, add 自我介绍与申请动机、群面/无领导小组、技术面、HR面、笔试/测评、三方协议/offer 比较 and 实习转正 from `docs/cn/校招实习面试准备.md`, tailored to the stage; do not add assumed current-employer, leaving-job or current-salary answers. For other Chinese profiles, add the four blocks from `docs/cn/面试准备.md`. Fill only from the profile and submitted documents. Both guides' placeholders are preparation fields, not scripts; leave unknown facts as questions and omit unsupported spoken claims. Do not copy 虚构 examples. Skip these blocks for non-Chinese roles.
 
 ### 1. Likely questions
 Derive from four sources, in priority order:
@@ -85,7 +86,7 @@ Save the pack in the archive folder derived in Step 1 as `interview_prep_<stage>
 
 ## Step 4: Offer a Mock Interview
 
-Ask if the user wants to practice. If the format is 群面 or 无领导小组讨论, practice that format from `docs/cn/面试准备.md` instead of the one-on-one roleplay, and still give feedback after each turn. Otherwise run the roleplay **in this conversation** following the Roleplay Guidelines in `07-interview-prep.md` exactly: warm-up first, then role-specific technical questions, 1-2 behavioral questions tied to the posting's competencies, and one tough question or curveball. After each answer, give brief feedback - what worked, what to sharpen, and which STAR example from the pack would have served better.
+Ask if the user wants to practice. If the format is 群面 or 无领导小组讨论, practice that format from the guide selected in Step 1 (`docs/cn/校招实习面试准备.md` for campus/intern, otherwise `docs/cn/面试准备.md`) instead of the one-on-one roleplay, and still give feedback after each turn. Otherwise run the roleplay **in this conversation** following the Roleplay Guidelines in `07-interview-prep.md` exactly: warm-up first, then role-specific technical questions, 1-2 behavioral questions tied to the posting's competencies, and one tough question or curveball. After each answer, give brief feedback - what worked, what to sharpen, and which STAR example from the pack would have served better.
 
 Calibrate feedback against `02-behavioral-profile.md`: coach toward the user's natural register, not a generic ideal - the same voice-consistency rule the `/apply` reviewer applies to cover letters.
 
