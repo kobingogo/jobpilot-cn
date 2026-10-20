@@ -1,9 +1,10 @@
 """tools/cn_jd_check.py screens a hand-pasted Chinese JD.
 
 Hard filters (degree, school tier, age, city, hukou, salary) come from
-config/cn_filters.example.json. Jargon lowers the score. Scam phrases reject.
-The tool never fetches, greets, or applies. Numbers in the example config and
-in these JDs are fictional.
+config/cn_filters.json when that file exists, otherwise the example file.
+Example thresholds are hints: those fails become flags. Jargon lowers the
+score. Scam phrases reject. The tool never fetches, greets, or applies.
+Numbers in the example config and in these JDs are fictional.
 """
 
 import ast
@@ -14,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parent.parent
 TOOL = REPO / "tools" / "cn_jd_check.py"
@@ -50,6 +52,27 @@ def _row(report, name):
     return next(item for item in report["hard_filters"] if item["name"] == name)
 
 
+def _write_filters(directory, data=None) -> Path:
+    """A non-example config file. Passing it keeps hard fails (source custom)."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "filters.json"
+    payload = data if data is not None else EXAMPLE.read_text(encoding="utf-8")
+    path.write_text(payload if isinstance(payload, str) else json.dumps(payload), encoding="utf-8")
+    return path
+
+
+REJECT = """\
+示意科技（虚构）
+工作地点：成都
+年龄：18-25岁
+学历：硕士及以上
+任职要求：985/211院校
+薪资：8-12K·12薪
+需本地户口
+"""
+
+
 class CheckJd(unittest.TestCase):
     def test_example_config_shape_and_clean_jd_passes(self):
         filters = cn_jd_check.load_filters()
@@ -75,6 +98,8 @@ class CheckJd(unittest.TestCase):
         self.assertEqual(_row(report, "salary")["status"], "pass")
         self.assertEqual(_row(report, "school_tier")["status"], "unknown")
         self.assertIn("Does not scrape", report["note"])
+        self.assertEqual(report["thresholds_source"], "example")
+        self.assertEqual(report["warning"], cn_jd_check.EXAMPLE_WARNING)
 
     def test_salary_15_25k_14_months_and_other_shapes(self):
         parsed = cn_jd_check.parse_salary("薪资：15-25K·14薪")
@@ -124,16 +149,11 @@ class CheckJd(unittest.TestCase):
         self.assertEqual(raised["parsed"]["degree"]["required"], "master")
 
     def test_hard_filters_reject_degree_school_age_city_hukou_salary(self):
-        jd = """\
-示意科技（虚构）
-工作地点：成都
-年龄：18-25岁
-学历：硕士及以上
-任职要求：985/211院校
-薪资：8-12K·12薪
-需本地户口
-"""
-        report = cn_jd_check.check_jd(jd)
+        with tempfile.TemporaryDirectory() as tmp:
+            custom = _write_filters(tmp)
+            report = cn_jd_check.check_jd(REJECT, config_path=custom)
+        self.assertEqual(report["thresholds_source"], "custom")
+        self.assertNotIn("warning", report)
         self.assertEqual(report["verdict"], "reject")
         self.assertTrue(report["hard_fail"])
         self.assertFalse(report["scam_fail"])
@@ -153,7 +173,9 @@ class CheckJd(unittest.TestCase):
         self.assertEqual(under["parsed"]["age"]["max"], 35)
         self.assertEqual(_row(under, "city")["status"], "pass")
 
-        capped = cn_jd_check.check_jd("年龄不超过27周岁")
+        with tempfile.TemporaryDirectory() as tmp:
+            capped = cn_jd_check.check_jd("年龄不超过27周岁", config_path=_write_filters(tmp))
+        self.assertEqual(capped["thresholds_source"], "custom")
         self.assertEqual(_row(capped, "age")["status"], "fail")
         self.assertEqual(capped["parsed"]["age"]["max"], 27)
 
@@ -244,7 +266,27 @@ class CheckJd(unittest.TestCase):
 
             code, out, err = _run(["--config", str(EXAMPLE)], stdin=CLEAN)
             self.assertEqual(code, 0, err)
-            self.assertEqual(json.loads(out)["thresholds"]["age"], 28)
+            example_clean = json.loads(out)
+            self.assertEqual(example_clean["thresholds"]["age"], 28)
+            self.assertEqual(example_clean["thresholds_source"], "example")
+            self.assertEqual(example_clean["warning"], cn_jd_check.EXAMPLE_WARNING)
+
+            custom = _write_filters(tmp)
+            code, out, err = _run(["--config", str(custom)], stdin="年龄不超过27周岁\n")
+            self.assertEqual(code, 0, err)
+            custom_report = json.loads(out)
+            self.assertEqual(custom_report["thresholds_source"], "custom")
+            self.assertTrue(custom_report["hard_fail"])
+            self.assertEqual(_row(custom_report, "age")["status"], "fail")
+            self.assertNotIn("warning", custom_report)
+
+            code, out, err = _run(["--config", str(EXAMPLE)], stdin="年龄不超过27周岁\n")
+            self.assertEqual(code, 0, err)
+            example_age = json.loads(out)
+            self.assertEqual(example_age["thresholds_source"], "example")
+            self.assertFalse(example_age["hard_fail"])
+            self.assertEqual(_row(example_age, "age")["status"], "flag")
+            self.assertEqual(example_age["warning"], cn_jd_check.EXAMPLE_WARNING)
 
             # Default config is next to the repo, not the process cwd.
             code, out, err = _run(["--in", str(path)], cwd="/tmp")
@@ -295,6 +337,90 @@ class CheckJd(unittest.TestCase):
         for banned in ("requests", "urllib", "http", "socket", "subprocess", "scrapy"):
             self.assertNotIn(banned, modules)
         self.assertIn("Pasted JD only", source)
+
+    def test_example_comment_and_gitignore_point_at_user_config(self):
+        comment = json.loads(EXAMPLE.read_text(encoding="utf-8"))["_comment"]
+        self.assertIn("config/cn_filters.json", comment)
+        rules = {
+            line.strip()
+            for line in (REPO / ".gitignore").read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+        self.assertIn("config/cn_filters.json", rules)
+        self.assertNotIn("config/cn_filters.example.json", rules)
+
+    def test_thresholds_source_user_example_and_custom(self):
+        """User file hard-fails. A missing user file, or an explicit example
+        path, is source example and downgrades those fails to flags."""
+        warning = "未找到 config/cn_filters.json，使用示例阈值，仅作提示"
+        self.assertEqual(cn_jd_check.EXAMPLE_WARNING, warning)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            user_data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+            user_data["age"] = {"candidate": 41}
+            user = _write_filters(root / "user", user_data)
+            example_data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+            example_data["age"] = {"candidate": 99}
+            example_copy = _write_filters(root / "example", example_data)
+            custom = _write_filters(root / "custom")
+            missing = root / "absent" / "cn_filters.json"
+
+            with mock.patch.object(cn_jd_check, "USER_CONFIG", user), \
+                 mock.patch.object(cn_jd_check, "EXAMPLE_CONFIG", example_copy):
+                loaded = cn_jd_check.load_filters()
+                self.assertEqual(loaded["age"]["candidate"], 41)
+                report = cn_jd_check.check_jd(REJECT)
+                self.assertEqual(report["thresholds_source"], "user")
+                self.assertEqual(report["thresholds"]["age"], 41)
+                self.assertNotIn("warning", report)
+                self.assertTrue(report["hard_fail"])
+                self.assertEqual(report["verdict"], "reject")
+                failed = {row["name"] for row in report["hard_filters"] if row["status"] == "fail"}
+                self.assertEqual(
+                    failed, {"degree", "school_tier", "age", "city", "hukou", "salary"}
+                )
+
+                via_user = cn_jd_check.check_jd(REJECT, config_path=user)
+                self.assertEqual(via_user["thresholds_source"], "user")
+                self.assertTrue(via_user["hard_fail"])
+
+                via_example = cn_jd_check.check_jd(REJECT, config_path=example_copy)
+                self.assertEqual(via_example["thresholds_source"], "example")
+                self.assertEqual(via_example["thresholds"]["age"], 99)
+                self.assertFalse(via_example["hard_fail"])
+                self.assertEqual(via_example["warning"], warning)
+                alias = example_copy.parent / "." / example_copy.name
+                via_alias = cn_jd_check.check_jd(REJECT, config_path=alias)
+                self.assertEqual(via_alias["thresholds_source"], "example")
+                self.assertFalse(via_alias["hard_fail"])
+
+                via_custom = cn_jd_check.check_jd(REJECT, config_path=custom)
+                self.assertEqual(via_custom["thresholds_source"], "custom")
+                self.assertTrue(via_custom["hard_fail"])
+                self.assertNotIn("warning", via_custom)
+                self.assertEqual(
+                    {row["name"] for row in via_custom["hard_filters"] if row["status"] == "fail"},
+                    {"degree", "school_tier", "age", "city", "hukou", "salary"},
+                )
+
+            with mock.patch.object(cn_jd_check, "USER_CONFIG", missing), \
+                 mock.patch.object(cn_jd_check, "EXAMPLE_CONFIG", example_copy):
+                self.assertFalse(missing.exists())
+                fallback = cn_jd_check.check_jd(REJECT)
+                self.assertEqual(fallback["thresholds_source"], "example")
+                self.assertEqual(fallback["thresholds"]["age"], 99)
+                self.assertFalse(fallback["hard_fail"])
+                self.assertEqual(fallback["verdict"], "caution")
+                self.assertEqual(fallback["warning"], warning)
+                self.assertEqual(
+                    {row["name"] for row in fallback["hard_filters"] if row["status"] == "fail"},
+                    set(),
+                )
+                for name in ("degree", "school_tier", "age", "city", "hukou", "salary"):
+                    self.assertEqual(_row(fallback, name)["status"], "flag")
+                self.assertIn("city_not_accepted", _row(fallback, "city")["codes"])
+                self.assertIn("salary_below_floor", _row(fallback, "salary")["codes"])
+                self.assertIn("hukou_required", _row(fallback, "hukou")["codes"])
 
 
 def _run(argv, stdin=None, cwd=None):

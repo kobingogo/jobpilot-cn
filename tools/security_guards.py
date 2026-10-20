@@ -193,6 +193,9 @@ REQUIRED_IGNORE_RULES = [
     # jobpilot-cn: local candidate profile and credential files. .env.example
     # is a secret-free template and is re-included via ALLOWED_IGNORE_NEGATIONS.
     "profile/",
+    # Local cn_jd_check thresholds. The tracked file is cn_filters.example.json;
+    # this copy can name cities, age, and a pay floor.
+    "config/cn_filters.json",
     "*.token",
     # Company research cache (/apply Step 3, /interview Step 2). Referenced
     # from commands, not a skill, so a plain rooted rule is correct here -

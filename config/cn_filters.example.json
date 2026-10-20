@@ -1,5 +1,5 @@
 {
-  "_comment": "Fictional search thresholds for tools/cn_jd_check.py. Not a real person: no name, phone, email, or ID. Edit a copy; do not put real personal data in this file.",
+  "_comment": "Fictional search thresholds for tools/cn_jd_check.py. Not a real person: no name, phone, email, or ID. Copy this file to config/cn_filters.json (gitignored) and edit that copy. The checker reads cn_filters.json when it exists; these example numbers are hints only. Do not put real personal data in this file.",
   "degree": {
     "candidate": "bachelor",
     "reject_if_required_above": true

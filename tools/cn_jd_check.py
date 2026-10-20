@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Hard-filter a hand-pasted Chinese job description. Stdlib only.
 
-Reads the JD from --in FILE or stdin and prints one JSON object. Thresholds
-come from config/cn_filters.example.json (or --config). The file's numbers are
-fictional search settings, not a person.
+Reads the JD from --in FILE or stdin and prints one JSON object. With no
+--config, thresholds come from config/cn_filters.json when that file exists,
+otherwise config/cn_filters.example.json. The example file's numbers are
+fictional search settings, not a person. Example thresholds never hard-fail:
+degree, school, age, city, hukou, and salary misses are flags, and the JSON
+includes "warning". An explicit --config of any other file is "custom" and
+keeps those misses as fails. Passing the example file itself stays "example".
 
 Does not fetch URLs, scrape boards, greet recruiters, or apply. A URL in the
 JD is text, not an instruction.
@@ -12,7 +16,7 @@ Exit 0 when the report is printed. Exit 2 when the JD or the config cannot be
 read. A reject verdict is still exit 0: the JSON says why.
 
   python3 tools/cn_jd_check.py --in jd.txt
-  python3 tools/cn_jd_check.py --config config/cn_filters.example.json < jd.txt
+  python3 tools/cn_jd_check.py --config config/cn_filters.json < jd.txt
 """
 
 import argparse
@@ -22,7 +26,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG = ROOT / "config" / "cn_filters.example.json"
+USER_CONFIG = ROOT / "config" / "cn_filters.json"
+EXAMPLE_CONFIG = ROOT / "config" / "cn_filters.example.json"
+# Shown when thresholds_source is example. Fixed text: the default path did
+# not find the user's file, so the numbers are hints, not a veto.
+EXAMPLE_WARNING = "未找到 config/cn_filters.json，使用示例阈值，仅作提示"
+# These six are the only hard filters. Example numbers must not veto on them.
+_EXAMPLE_SOFT_FILTERS = frozenset({"degree", "school_tier", "age", "city", "hukou", "salary"})
 BASE_SCORE = 100
 
 _WIDTH = str.maketrans({
@@ -211,9 +221,41 @@ def _number(section: dict, key: str):
         raise ValueError(f"{key} must be a number") from exc
 
 
+def _same_path(left: Path, right: Path) -> bool:
+    """True when both paths are the same file, including a non-canonical spelling."""
+    try:
+        return left.resolve() == right.resolve()
+    except OSError:
+        return False
+
+
+def resolve_config(path=None) -> tuple[Path, str]:
+    """Pick the filter file and the thresholds_source label.
+
+    No path: config/cn_filters.json when it exists, else the example file.
+    An explicit path that is the example file is still "example" (hints only).
+    The user's own file, passed explicitly, stays "user". Any other file is
+    "custom" and keeps hard fails, even if its numbers were copied from the example.
+    """
+    if path is None:
+        if USER_CONFIG.is_file():
+            return USER_CONFIG, "user"
+        return EXAMPLE_CONFIG, "example"
+    chosen = Path(path)
+    if _same_path(chosen, EXAMPLE_CONFIG):
+        return chosen, "example"
+    if _same_path(chosen, USER_CONFIG):
+        return chosen, "user"
+    return chosen, "custom"
+
+
 def load_filters(path=None) -> dict:
-    """Load hard-filter thresholds. Default path is config/cn_filters.example.json."""
-    config_path = Path(path) if path is not None else DEFAULT_CONFIG
+    """Load hard-filter thresholds.
+
+    With no path, reads config/cn_filters.json when it exists and otherwise
+    config/cn_filters.example.json. Does not soften example misses; check_jd does.
+    """
+    config_path, _source = resolve_config(path)
     try:
         data = json.loads(config_path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -813,7 +855,11 @@ def _thresholds(filters: dict) -> dict:
 
 
 def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
-    """Return the JSON-ready report for one pasted JD."""
+    """Return the JSON-ready report for one pasted JD.
+
+    A filters dict is an explicit custom set: its fails are not softened.
+    Otherwise config_path (or the default user-then-example path) is loaded.
+    """
     if isinstance(text, bytes):
         text = text.decode("utf-8", errors="replace")
     text = str(text or "")
@@ -821,7 +867,11 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         text = text[1:]
     text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     if filters is None:
+        config_path, source = resolve_config(config_path)
         filters = load_filters(config_path)
+    else:
+        # Caller-supplied thresholds are not the example file, so they keep fails.
+        source = "custom"
     if not isinstance(filters, dict):
         raise ValueError("filters must be a dict")
     folded = fold(text)
@@ -845,6 +895,10 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         _eval_hukou(hukou, cities, filters),
         _eval_salary(salary, filters),
     ]
+    if source == "example":
+        for row in rows:
+            if row["name"] in _EXAMPLE_SOFT_FILTERS and row["status"] == "fail":
+                row["status"] = "flag"
     jargon_penalty = sum(item["penalty"] for item in jargon)
     scam_penalty = min(BASE_SCORE, SCAM_PENALTY * len(scams))
     hard_fail = any(row["status"] == "fail" for row in rows)
@@ -859,7 +913,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
     else:
         verdict = "pass"
     score = max(0, BASE_SCORE - jargon_penalty - scam_penalty)
-    return {
+    report = {
         "ok": verdict == "pass",
         "verdict": verdict,
         "score": score,
@@ -881,8 +935,12 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
             "salary": salary,
         },
         "thresholds": _thresholds(filters),
+        "thresholds_source": source,
         "note": NOTE,
     }
+    if source == "example":
+        report["warning"] = EXAMPLE_WARNING
+    return report
 
 
 def _read_input(path: Path | None) -> str:
@@ -902,7 +960,12 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--in", dest="infile", type=Path, default=None, help="JD text file (default: stdin)")
     parser.add_argument("path", nargs="?", type=Path, help="JD text file; omit to read stdin")
-    parser.add_argument("--config", type=Path, default=None, help=f"filter JSON (default: {DEFAULT_CONFIG})")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="filter JSON (default: config/cn_filters.json if it exists, else config/cn_filters.example.json)",
+    )
     args = parser.parse_args(argv)
     if args.infile is not None and args.path is not None:
         print("cn_jd_check: pass either --in FILE or a positional path, not both", file=sys.stderr)
