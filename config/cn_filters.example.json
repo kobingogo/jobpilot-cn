@@ -22,5 +22,8 @@
   "salary": {
     "min_monthly_k": 20,
     "min_months": 13
+  },
+  "labor": {
+    "candidate_is_student": null
   }
 }

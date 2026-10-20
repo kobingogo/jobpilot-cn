@@ -423,6 +423,285 @@ class CheckJd(unittest.TestCase):
                 self.assertIn("hukou_required", _row(fallback, "hukou")["codes"])
 
 
+class LaborCheck(unittest.TestCase):
+    def check(self, text, filters=None):
+        return cn_jd_check.check_jd(text, filters={} if filters is None else filters)
+
+    def hits(self, report, name):
+        return [hit for hit in report["labor"] if hit["name"] == name]
+
+    def test_probation_months_boundaries_and_chinese_units(self):
+        for text, months, status in (
+            ("试用期1个月", None, None),
+            ("试用期两个月", None, None),
+            ("试用期为三个月", None, None),
+            ("试用期半个月", None, None),
+            ("试用期一个半月", None, None),
+            ("试用期4个月", 4, "info"),
+            ("试用期三个月半", 3.5, "info"),
+            ("试用期：6个月", 6, "info"),
+            ("试用期半年", 6, "info"),
+            ("试用期限为六个月", 6, "info"),
+            ("试用期６个月", 6, "info"),
+            ("试用期6.5个月", 6.5, "flag"),
+            ("试用期六个半月", 6.5, "flag"),
+            ("试用期七个月", 7, "flag"),
+            ("试用期一年", 12, "flag"),
+            ("试用期为期十二个月", 12, "flag"),
+            ("试用期一年半", 18, "flag"),
+            ("试用期两年", 24, "flag"),
+        ):
+            with self.subTest(text=text):
+                report = self.check(text)
+                hits = self.hits(report, "probation_months")
+                if months is None:
+                    self.assertEqual(hits, [])
+                    self.assertEqual(report["verdict"], "pass")
+                else:
+                    self.assertEqual(len(hits), 1)
+                    self.assertEqual(hits[0]["value"], months)
+                    self.assertEqual(hits[0]["status"], status)
+                    self.assertEqual(report["verdict"], "caution")
+                self.assertFalse(report["hard_fail"])
+                self.assertEqual(report["labor_penalty"], 6 if status == "flag" else 0)
+
+    def test_long_probation_is_flagged_even_with_long_contract(self):
+        report = self.check("签订三年以上劳动合同，试用期一年")
+        self.assertEqual(self.hits(report, "probation_months")[0]["status"], "flag")
+        self.assertEqual(report["verdict"], "caution")
+
+    def test_probation_pay_below_eighty(self):
+        for text, ratio in (
+            ("试用期工资七折", 70),
+            ("试用期薪资打7折", 70),
+            ("试用期打七五折", 75),
+            ("试用期打7.5折", 75),
+            ("试用期工资79.9%", 79.9),
+            ("试用期工资为工资的70%", 70),
+            ("试用期按转正工资的７０％发放", 70),
+            ("试用期工资为百分之七十", 70),
+            ("试用期间工资70%", 70),
+            ("试用期6个月，打七折", 70),
+            ("试用期6个月，工资的70%", 70),
+        ):
+            with self.subTest(text=text):
+                report = self.check(text)
+                hit = self.hits(report, "probation_pay_ratio")[0]
+                self.assertEqual(hit["value"], ratio)
+                self.assertEqual(hit["status"], "flag")
+                self.assertEqual(report["labor_penalty"], 6)
+                self.assertEqual(report["score"], 94)
+                self.assertEqual(report["verdict"], "caution")
+
+    def test_eighty_percent_and_other_percentages_are_not_flags(self):
+        for text in (
+            "试用期工资八折", "试用期打8折", "试用期工资80%",
+            "试用期工资为工资的80%", "试用期工资百分之八十",
+            "试用期工资100%", "试用期工资打九折", "试用期工资８０％",
+            "试用期2个月，绩效占工资的70%", "试用期项目完成率70%",
+            "试用期1个月。转正后工资的70%为基本工资",
+            "试用期1个月；转正后工资的70%为基本工资",
+            "试用期1个月\n转正后工资的70%为基本工资",
+            "试用期1个月，转正后工资的70%为基本工资",
+            "试用期1个月，工资20K，转正后工资的70%为基本工资",
+            "正式工资打七折", "一年合同，月薪20K",
+        ):
+            with self.subTest(text=text):
+                report = self.check(text)
+                self.assertEqual(report["labor"], [])
+                self.assertEqual(report["labor_penalty"], 0)
+                self.assertEqual(report["verdict"], "pass")
+
+    def test_social_insurance_risks(self):
+        for text, code in (
+            ("五险一金按最低基数缴纳", "insurance_minimum_base"),
+            ("按最低标准缴纳社保", "insurance_minimum_base"),
+            ("五险一金最低标准缴纳", "insurance_minimum_base"),
+            ("五险一金按最低基数", "insurance_minimum_base"),
+            ("转正后缴五险一金", "insurance_after_probation"),
+            ("转正后才缴纳五险一金", "insurance_after_probation"),
+            ("转正后购买五险一金", "insurance_after_probation"),
+            ("转正后才购买社保", "insurance_after_probation"),
+            ("试用期不缴社保", "insurance_unpaid_probation"),
+            ("试用期不买社保", "insurance_unpaid_probation"),
+            ("试用期间不交五险一金", "insurance_unpaid_probation"),
+            ("自愿放弃社保", "insurance_waived"),
+            ("自愿放弃社会保险", "insurance_waived"),
+            ("不交公积金", "housing_fund_unpaid"),
+            ("不缴纳住房公积金", "housing_fund_unpaid"),
+        ):
+            with self.subTest(text=text):
+                report = self.check(text)
+                hits = self.hits(report, "social_insurance")
+                self.assertEqual(len(hits), 1)
+                self.assertEqual(hits[0]["status"], "flag")
+                self.assertEqual(hits[0]["codes"], [code])
+                self.assertEqual(report["labor_penalty"], 6)
+                self.assertFalse(report["hard_fail"])
+                self.assertFalse(report["scam_fail"])
+                self.assertEqual(report["verdict"], "caution")
+
+    def test_positive_benefits_do_not_deduct_or_trigger_caution(self):
+        report = self.check("六险二金，社保全额缴纳，按实际工资缴纳，补充公积金")
+        self.assertEqual(len(report["labor"]), 4)
+        for hit in report["labor"]:
+            self.assertEqual(hit["status"], "info")
+            self.assertFalse(hit["risk"])
+            self.assertEqual(hit["codes"], ["insurance_positive"])
+        self.assertEqual(_row(report, "labor")["status"], "info")
+        self.assertEqual(report["verdict"], "pass")
+        self.assertEqual(report["score"], 100)
+        self.assertEqual(report["labor_penalty"], 0)
+
+    def test_negation_suppresses_risks_and_positive_claims(self):
+        for text in (
+            "拒绝试用期一年", "并非试用期七个月", "不是试用期工资七折",
+            "试用期工资不打七折", "试用期工资不是70%",
+            "不按最低基数缴纳", "拒绝按最低标准缴纳",
+            "并非最低标准缴纳",
+            "并非转正后才缴纳五险一金", "禁止试用期不缴社保",
+            "不要自愿放弃社保", "杜绝不交公积金",
+            "不以实习协议代替劳动合同", "严禁不签劳动合同",
+            "并非人力外包", "非劳务派遣", "不驻场", "不是派遣制",
+            "不提供六险二金", "无补充公积金", "并非全额缴纳",
+            "不是按实际工资缴纳",
+        ):
+            with self.subTest(text=text):
+                report = self.check(text)
+                self.assertEqual(report["labor"], [])
+                self.assertEqual(_row(report, "labor")["status"], "unknown")
+                self.assertEqual(report["score"], 100)
+                self.assertEqual(report["verdict"], "pass")
+
+    def test_negated_occurrence_does_not_hide_a_later_risk(self):
+        report = self.check("不按最低基数缴纳。另一岗位按最低基数缴纳")
+        self.assertEqual(len(report["labor"]), 1)
+        self.assertEqual(report["labor"][0]["status"], "flag")
+        mixed = self.check("六险二金，不交公积金")
+        self.assertEqual({hit["status"] for hit in mixed["labor"]}, {"flag", "info"})
+        self.assertEqual(mixed["verdict"], "caution")
+
+    def test_outsourcing_is_information_with_no_deduction(self):
+        for text in ("外包", "驻场", "劳务派遣", "人力外包", "派遣制"):
+            with self.subTest(text=text):
+                report = self.check(text)
+                hits = self.hits(report, "outsourcing")
+                self.assertEqual(len(hits), 1)
+                self.assertEqual(hits[0]["status"], "info")
+                self.assertEqual(report["verdict"], "caution")
+                self.assertEqual(report["score"], 100)
+                self.assertEqual(report["labor_penalty"], 0)
+
+    def test_contract_risks_and_student_context(self):
+        for text in ("不签合同", "不签劳动合同", "不签订书面劳动合同", "以实习协议代替劳动合同"):
+            with self.subTest(text=text):
+                report = self.check(text)
+                self.assertEqual(self.hits(report, "contract")[0]["status"], "flag")
+                self.assertEqual(report["labor_penalty"], 6)
+                self.assertEqual(report["verdict"], "caution")
+        student_text = "仅招在校生，以实习协议代替劳动合同"
+        student = self.check(student_text)
+        self.assertEqual(self.hits(student, "contract")[0]["status"], "info")
+        self.assertEqual(student["labor_penalty"], 0)
+        explicit_student = self.check("不签劳动合同", {"labor": {"candidate_is_student": True}})
+        self.assertEqual(self.hits(explicit_student, "contract")[0]["status"], "info")
+        non_student = self.check(student_text, {"labor": {"candidate_is_student": False}})
+        self.assertEqual(self.hits(non_student, "contract")[0]["status"], "flag")
+        negated_student = self.check("非在校生，不签劳动合同")
+        self.assertEqual(self.hits(negated_student, "contract")[0]["status"], "flag")
+
+    def test_labor_config_validation_and_legacy_config(self):
+        self.assertEqual(self.check("双休", {})["labor"], [])
+        self.assertEqual(self.check("双休", {"labor": None})["labor"], [])
+        for value in ("false", 0, 1, [], {}):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "candidate_is_student"):
+                    self.check("双休", {"labor": {"candidate_is_student": value}})
+        with tempfile.TemporaryDirectory() as tmp:
+            config = _write_filters(tmp, {"labor": []})
+            with self.assertRaisesRegex(ValueError, "labor must be a JSON object"):
+                cn_jd_check.load_filters(config)
+            config = _write_filters(tmp, {"labor": {"candidate_is_student": "true"}})
+            with self.assertRaisesRegex(ValueError, "candidate_is_student"):
+                cn_jd_check.load_filters(config)
+
+    def test_report_jd3_and_summary_row(self):
+        report = self.check("试用期6个月，打八折，五险一金按最低基数缴纳")
+        self.assertEqual({hit["name"] for hit in report["labor"]}, {"probation_months", "social_insurance"})
+        self.assertEqual(_row(report, "labor")["status"], "flag")
+        self.assertIn("probation_check_contract_term", _row(report, "labor")["codes"])
+        self.assertIn("insurance_minimum_base", _row(report, "labor")["codes"])
+        self.assertEqual(report["score"], 94)
+        self.assertEqual(report["verdict"], "caution")
+        self.assertFalse(report["hard_fail"])
+        self.assertFalse(report["scam_fail"])
+        self.assertFalse(report["ok"])
+
+    def test_penalty_per_dimension_and_never_rejects(self):
+        text = "试用期一年，试用期工资七折，转正后才缴五险一金，不交公积金，不签劳动合同"
+        for filters in ({}, cn_jd_check.load_filters()):
+            with self.subTest(filters=filters):
+                report = self.check(text, filters)
+                self.assertEqual(report["labor_penalty"], 24)
+                self.assertEqual(report["score"], 76)
+                self.assertEqual(report["verdict"], "caution")
+                self.assertFalse(report["hard_fail"])
+                self.assertFalse(report["scam_fail"])
+        repeated = self.check("试用期一年，试用期七个月，试用期一年")
+        self.assertEqual(repeated["labor_penalty"], 6)
+        self.assertEqual(repeated["score"], 94)
+        many = self.check("，".join(["试用期一年"] * 30))
+        self.assertEqual(many["verdict"], "caution")
+        self.assertEqual(many["labor_penalty"], 6)
+
+    def test_existing_penalties_and_rejections_still_apply(self):
+        jargon = self.check("狼性，试用期一年")
+        self.assertEqual(jargon["score"], 82)
+        self.assertEqual(jargon["jargon_penalty"], 12)
+        self.assertEqual(jargon["labor_penalty"], 6)
+        self.assertEqual(jargon["verdict"], "caution")
+        hard = self.check("工作地点：成都，不签劳动合同", {"city": {"accept": ["北京"]}})
+        self.assertTrue(hard["hard_fail"])
+        self.assertEqual(hard["verdict"], "reject")
+        scam = self.check("需缴纳押金，不签劳动合同")
+        self.assertTrue(scam["scam_fail"])
+        self.assertEqual(scam["verdict"], "reject")
+        self.assertEqual(scam["score"], 64)
+        clamped = self.check(JARGON + "，试用期一年，试用期工资七折，不签劳动合同，缴纳押金")
+        self.assertEqual(clamped["score"], 0)
+
+    def test_cli_labor_output_and_example_source(self):
+        code, out, err = _run(["--config", str(EXAMPLE)], stdin="试用期一年，工资七折，不交公积金")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(err, "")
+        report = json.loads(out)
+        self.assertEqual(report["thresholds_source"], "example")
+        self.assertEqual(report["verdict"], "caution")
+        self.assertEqual(_row(report, "labor")["status"], "flag")
+        self.assertEqual(report["labor_penalty"], 18)
+        self.assertEqual(report["score"], 82)
+
+    def test_exact_supplied_legal_bases_and_hint_wording(self):
+        bases = {
+            "probation_months": "《劳动合同法》第十九条：劳动合同期限三个月以上不满一年的，试用期不得超过一个月；一年以上不满三年的，不得超过二个月；三年以上固定期限和无固定期限的，不得超过六个月；同一用人单位与同一劳动者只能约定一次试用期。",
+            "probation_pay_ratio": "《劳动合同法》第二十条：试用期工资不得低于本单位相同岗位最低档工资或者劳动合同约定工资的百分之八十，并不得低于用人单位所在地的最低工资标准。",
+            "contract": "《劳动合同法》第十条：建立劳动关系，应当订立书面劳动合同。",
+            "outsourcing": "《劳动合同法》第五十九条（派遣单位与用工单位订立劳务派遣协议）、第六十六条（劳务派遣只能在临时性、辅助性或者替代性的工作岗位上实施）；《劳务派遣暂行规定》第四条（派遣用工数量不得超过其用工总量的10%）。",
+            "social_insurance": "《社会保险法》第五十八条（用人单位应当自用工之日起三十日内为其职工申请办理社会保险登记）、第六十条（用人单位应当自行申报、按时足额缴纳社会保险费）；《住房公积金管理条例》第二十条（单位应当按时、足额缴存住房公积金）。",
+        }
+        report = self.check("试用期一年，试用期工资70%，不交公积金，六险二金，人力外包，不签劳动合同")
+        self.assertEqual({hit["name"] for hit in report["labor"]}, set(bases))
+        for hit in report["labor"]:
+            self.assertEqual(hit["legal_basis"], bases[hit["name"]])
+            self.assertIn("风险提示，非法律意见，以合同和当地人社部门解释为准", hit["detail"])
+            self.assertIn(hit["evidence"], report["hard_filters"][-1]["evidence"])
+            self.assertNotIn("违法", hit["detail"])
+            self.assertIn(hit["status"], {"flag", "info"})
+            self.assertIn(hit["legal_basis"], _row(report, "labor")["legal_basis"])
+        self.assertEqual(self.check("")["labor"], [])
+        self.assertEqual(self.check("")["verdict"], "empty")
+
+
 def _run(argv, stdin=None, cwd=None):
     proc = subprocess.run(
         [sys.executable, str(TOOL), *argv],

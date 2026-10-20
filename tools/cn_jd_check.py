@@ -14,6 +14,11 @@ downgrades that fail to flag). On the example file, a candidate who already
 fits the posted cap stays pass. notices names the cap, and the verdict is at
 least caution.
 
+Labor-rights hints live in labor and a labor summary row. Flags deduct six
+points per dimension; information and positive benefits do not deduct points.
+Labor hints never reject. Each hit carries a supplied legal_basis and risk
+disclaimer. labor.candidate_is_student can override student wording in the JD.
+
 Does not fetch URLs, scrape boards, greet recruiters, or apply. A URL in the
 JD is text, not an instruction.
 
@@ -39,6 +44,15 @@ EXAMPLE_WARNING = "未找到 config/cn_filters.json，使用示例阈值，仅�
 # These six are the only hard filters. Example numbers must not veto on them.
 _EXAMPLE_SOFT_FILTERS = frozenset({"degree", "school_tier", "age", "city", "hukou", "salary"})
 BASE_SCORE = 100
+LABOR_FLAG_PENALTY = 6
+LABOR_NOTE = "风险提示，非法律意见，以合同和当地人社部门解释为准"
+LABOR_BASIS = {
+    "probation_months": "《劳动合同法》第十九条：劳动合同期限三个月以上不满一年的，试用期不得超过一个月；一年以上不满三年的，不得超过二个月；三年以上固定期限和无固定期限的，不得超过六个月；同一用人单位与同一劳动者只能约定一次试用期。",
+    "probation_pay_ratio": "《劳动合同法》第二十条：试用期工资不得低于本单位相同岗位最低档工资或者劳动合同约定工资的百分之八十，并不得低于用人单位所在地的最低工资标准。",
+    "contract": "《劳动合同法》第十条：建立劳动关系，应当订立书面劳动合同。",
+    "outsourcing": "《劳动合同法》第五十九条（派遣单位与用工单位订立劳务派遣协议）、第六十六条（劳务派遣只能在临时性、辅助性或者替代性的工作岗位上实施）；《劳务派遣暂行规定》第四条（派遣用工数量不得超过其用工总量的10%）。",
+    "social_insurance": "《社会保险法》第五十八条（用人单位应当自用工之日起三十日内为其职工申请办理社会保险登记）、第六十条（用人单位应当自行申报、按时足额缴纳社会保险费）；《住房公积金管理条例》第二十条（单位应当按时、足额缴存住房公积金）。",
+}
 
 _WIDTH = str.maketrans({
     "０": "0", "１": "1", "２": "2", "３": "3", "４": "4",
@@ -291,6 +305,48 @@ _MONTHS_TAIL = re.compile(r"^\s*(?:[·*x×/／]|（|\()?\s*(?P<m>\d{1,2})\s*薪\
 _MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})\s*(?:薪|months?\b)", re.I)
 _HUKOU = re.compile(r"(?P<prefix>.{0,12})(?P<kind>户口|户籍)")
 
+_CN_DIGITS = "零一二三四五六七八九"
+_LABOR_NUMBER = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百]+)"
+_PROBATION = re.compile(r"试用期(?:间|内)?")
+_PROBATION_MONTHS = re.compile(
+    r"试用期(?:限)?\s*(?:[：:]|为期|为|是|长达|共|约定为)?\s*"
+    rf"(?P<duration>半年|半个?月|{_LABOR_NUMBER}\s*(?:个半月|个?月半?|年半?))"
+)
+_PROBATION_RATIO = re.compile(
+    rf"(?P<discount>打?\s*(?P<fold>\d+(?:\.\d+)?|[一二三四五六七八九]{{1,2}})\s*折)"
+    r"|(?P<percent>\d+(?:\.\d+)?\s*[%％])"
+    rf"|百分之(?P<cn_percent>{_LABOR_NUMBER})"
+)
+_LABOR_BREAK = re.compile(r"[。；;！!？?\n]")
+_INSURANCE = r"(?:五险一金|五险|社保|社会保险|住房公积金|公积金)"
+_LABOR_PHRASES = (
+    ("social_insurance", "flag", "insurance_minimum_base",
+     re.compile(r"按\s*最低\s*(?:基数|标准)(?:\s*(?:缴纳|缴存|缴费))?"
+                r"|最低\s*(?:基数|标准)\s*(?:缴纳|缴存|缴费)"),
+     "出现最低缴纳基数或标准表述，建议核对实际工资、缴费基数及当地口径"),
+    ("social_insurance", "flag", "insurance_after_probation",
+     re.compile(rf"转正后\s*(?:才|再|开始)?\s*(?:缴纳|缴存|缴|购买|买|交纳|交)\s*{_INSURANCE}"),
+     "出现转正后起缴表述，建议核对入职起缴安排"),
+    ("social_insurance", "flag", "insurance_unpaid_probation",
+     re.compile(rf"试用期(?:间|内)?\s*(?:不|未)(?:予|予以)?\s*(?:缴纳|缴存|缴|购买|买|交纳|交)\s*{_INSURANCE}"),
+     "出现试用期未缴表述，建议核对入职起缴安排"),
+    ("social_insurance", "flag", "insurance_waived",
+     re.compile(r"自愿放弃\s*(?:社保|社会保险|五险一金)"),
+     "出现自愿放弃社保表述，建议核对用工及缴费安排"),
+    ("social_insurance", "flag", "housing_fund_unpaid",
+     re.compile(r"不\s*(?:交纳|缴纳|缴存|购买|交|缴|买)\s*(?:住房)?公积金"),
+     "出现不缴公积金表述，建议核对缴存安排"),
+    ("social_insurance", "info", "insurance_positive",
+     re.compile(r"六险二金|全额缴纳|按实际工资缴纳|补充公积金"),
+     "正向福利表述，建议在合同或福利说明中核对缴纳项目及基数"),
+    ("outsourcing", "info", "outsourcing_stated",
+     re.compile(r"人力外包|劳务派遣|派遣制|外包|驻场"),
+     "出现外包、驻场或派遣表述，建议核对签约主体及用工形式；派遣相关依据仅供核对派遣安排"),
+    ("contract", "flag", "contract_missing",
+     re.compile(r"不\s*签(?:订|署)?\s*(?:书面)?\s*(?:劳动)?合同|以实习协议代替劳动合同"),
+     "出现不签合同或以实习协议代替劳动合同表述，建议核对劳动关系及书面合同安排"),
+)
+
 NOTE = "Pasted JD only. Does not scrape, greet, or apply."
 
 
@@ -384,8 +440,9 @@ def load_filters(path=None) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"{config_path} must contain a JSON object")
     # Touch each section so a mistyped object fails here, not halfway through a JD.
-    for key in ("degree", "school_tier", "age", "city", "hukou", "salary"):
+    for key in ("degree", "school_tier", "age", "city", "hukou", "salary", "labor"):
         _section(data, key)
+    _labor_student(data)
     return data
 
 
@@ -958,6 +1015,153 @@ def _row(name, status, evidence="", detail="", codes=None) -> dict:
     }
 
 
+def _labor_student(filters: dict):
+    value = _section(filters, "labor").get("candidate_is_student")
+    if value is not None and not isinstance(value, bool):
+        raise ValueError("labor.candidate_is_student must be a boolean or null")
+    return value
+
+
+def _labor_number(value: str) -> float:
+    value = value.replace("两", "二").replace("〇", "零")
+    if value.isascii():
+        return float(value)
+    total = current = 0
+    for char in value:
+        if char in "十百":
+            total += (current or 1) * (10 if char == "十" else 100)
+            current = 0
+        else:
+            current = _CN_DIGITS.index(char)
+    return total + current
+
+
+def _probation_months(duration: str) -> float:
+    duration = re.sub(r"\s+", "", duration)
+    if duration.startswith("半"):
+        return 6 if duration == "半年" else 0.5
+    number = re.match(_LABOR_NUMBER, duration).group(0)
+    months = _labor_number(number)
+    if "年" in duration:
+        return months * 12 + (6 if "半" in duration else 0)
+    return months + (0.5 if "半" in duration else 0)
+
+
+def _labor_hit(name, status, evidence, detail, code, value=None, risk=True) -> dict:
+    hit = _row(name, status, evidence, f"{detail}。{LABOR_NOTE}", [code])
+    hit["legal_basis"] = LABOR_BASIS[name]
+    hit["risk"] = risk
+    if value is not None:
+        hit["value"] = _round_num(value)
+    return hit
+
+
+def _eval_labor(text: str, filters: dict) -> list:
+    """Evidence-backed hints only. No labor hit can be a hard-filter fail."""
+    hits = []
+    for match in _PROBATION_MONTHS.finditer(text):
+        if _negated(text, match.start()):
+            continue
+        months = _probation_months(match.group("duration"))
+        if months <= 3:
+            continue
+        over = months > 6
+        detail = (
+            "试用期表述超过六个月，存在期限风险，建议核对并咨询当地人社部门"
+            if over else "试用期超过三个月且不超过六个月，建议核对劳动合同期限"
+        )
+        hits.append((match.start(), _labor_hit(
+            "probation_months", "flag" if over else "info", match.group(0), detail,
+            "probation_over_six_months" if over else "probation_check_contract_term", months,
+        )))
+
+    anchors = list(_PROBATION.finditer(text))
+    for index, anchor in enumerate(anchors):
+        if _negated(text, anchor.start()):
+            continue
+        # Stay near this probation clause. One comma can join its duration and
+        # pay ("试用期6个月，打八折"), but unrelated benefits must not supply a ratio.
+        stop = min(len(text), anchor.end() + 64)
+        if index + 1 < len(anchors):
+            stop = min(stop, anchors[index + 1].start())
+        boundary = _LABOR_BREAK.search(text, anchor.end(), stop)
+        if boundary:
+            stop = boundary.start()
+        window = text[anchor.end():stop]
+        for ratio in _PROBATION_RATIO.finditer(window):
+            prefix = window[:ratio.start()]
+            if re.search(r"完成率|达标率|出勤率|绩效占比|提成占比", prefix):
+                continue
+            clauses = re.split(r"[，,]", prefix)
+            if len(clauses) > 2:
+                continue
+            if len(clauses) == 2 and not re.match(
+                r"\s*(?:试用期|工资|薪资|薪酬|待遇|打|按|为|\d|[一二三四五六七八九])",
+                window[len(clauses[0]) + 1:],
+            ):
+                continue
+            at = anchor.end() + ratio.start()
+            if _negated(text, at):
+                continue
+            if ratio.group("fold"):
+                amount = ratio.group("fold")
+                # 七五折 is 75%, just as 7.5折 is 75%.
+                if not amount.isascii() and len(amount) == 2:
+                    value = sum(_CN_DIGITS.index(c) * p for c, p in zip(amount, (10, 1)))
+                else:
+                    value = _labor_number(amount) * 10
+            elif ratio.group("cn_percent"):
+                value = _labor_number(ratio.group("cn_percent"))
+            else:
+                value = float(ratio.group("percent").rstrip("%％ "))
+            if value < 80:
+                hits.append((anchor.start(), _labor_hit(
+                    "probation_pay_ratio", "flag", text[anchor.start():anchor.end() + ratio.end()],
+                    "试用期工资比例表述低于80%，建议核对工资约定及当地最低工资标准",
+                    "probation_pay_below_eighty", value,
+                )))
+
+    student = _labor_student(filters)
+    if student is None:
+        # A mention of 实习协议 alone says nothing about student status.
+        student = any(
+            not _negated(text, m.start()) for m in re.finditer(
+                r"在校(?:大学)?生|在(?:校|读)(?:学生|本科|硕士|博士)", text,
+            )
+        )
+    occupied = []
+    for name, status, code, pattern, detail in _LABOR_PHRASES:
+        for match in pattern.finditer(text):
+            if _overlaps(occupied, match.start(), match.end()):
+                continue
+            occupied.append((match.start(), match.end()))
+            if _negated(text, match.start()):
+                continue
+            if name == "contract" and student:
+                hit = _labor_hit(
+                    name, "info", match.group(0),
+                    "在校生协议适用需结合实际用工性质核对，不据此判断劳动关系",
+                    "student_contract_check",
+                )
+            else:
+                hit = _labor_hit(name, status, match.group(0), detail, code,
+                                 risk=code != "insurance_positive")
+            hits.append((match.start(), hit))
+    hits.sort(key=lambda item: item[0])
+    return [hit for _at, hit in hits]
+
+
+def _labor_row(hits: list) -> dict:
+    status = "flag" if any(hit["status"] == "flag" for hit in hits) else "info" if hits else "unknown"
+    row = _row(
+        "labor", status, "；".join(_unique(hit["evidence"] for hit in hits)),
+        LABOR_NOTE if hits else "JD未命中劳动权益提示，不代表用工安排已获核验",
+        _unique(code for hit in hits for code in hit["codes"]),
+    )
+    row["legal_basis"] = "\n".join(_unique(hit["legal_basis"] for hit in hits))
+    return row
+
+
 def _eval_degree(parsed: dict, filters: dict) -> dict:
     section = _section(filters, "degree")
     if not section:
@@ -1165,6 +1369,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
     lure = find_lure(lowered)
     jargon.extend({"phrase": item["phrase"], "penalty": item["penalty"]} for item in lure)
     scams = find_scams(lowered)
+    labor = _eval_labor(folded, filters)
     lure_scam = _lure_scam(lure)
     if lure_scam:
         scams.append(lure_scam)
@@ -1175,6 +1380,7 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         _eval_city(cities, filters),
         _eval_hukou(hukou, cities, filters),
         _eval_salary(salary, filters),
+        _labor_row(labor),
     ]
     if source == "example":
         for row in rows:
@@ -1187,6 +1393,8 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
     notices = _age_cap_notices(age)
     jargon_penalty = sum(item["penalty"] for item in jargon)
     scam_penalty = min(BASE_SCORE, SCAM_PENALTY * len(scams))
+    # Repeated wording within one labor dimension must not multiply deductions.
+    labor_penalty = LABOR_FLAG_PENALTY * len({hit["name"] for hit in labor if hit["status"] == "flag"})
     hard_fail = any(row["status"] == "fail" for row in rows)
     flagged = any(row["status"] == "flag" for row in rows)
     scam_fail = bool(scams)
@@ -1194,11 +1402,11 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         verdict = "empty"
     elif hard_fail or scam_fail:
         verdict = "reject"
-    elif flagged or jargon_penalty or notices:
+    elif flagged or jargon_penalty or notices or any(hit["risk"] for hit in labor):
         verdict = "caution"
     else:
         verdict = "pass"
-    score = max(0, BASE_SCORE - jargon_penalty - scam_penalty)
+    score = max(0, BASE_SCORE - jargon_penalty - scam_penalty - labor_penalty)
     report = {
         "ok": verdict == "pass",
         "verdict": verdict,
@@ -1213,6 +1421,8 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
         "jargon_penalty": jargon_penalty,
         "scam": scams,
         "scam_penalty": scam_penalty,
+        "labor": labor,
+        "labor_penalty": labor_penalty,
         "parsed": {
             "degree": degree,
             "school_tier": school,
