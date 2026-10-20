@@ -1,0 +1,24 @@
+{
+  "_comment": "Placeholders only. Not a real key and not a person. Do not put API keys, tokens, or résumé text in this tracked file. Keys stay in a gitignored .env that this repo does not create. See docs/cn/模型配置.md. No scraping, no auto greeting, no auto applying. Job descriptions are pasted by hand.",
+  "MODEL_PROVIDER": "deepseek",
+  "providers": {
+    "deepseek": {
+      "label": "DeepSeek",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "api_key": "your-key-here",
+      "base_url": "https://api.deepseek.com"
+    },
+    "kimi": {
+      "label": "Kimi (Moonshot)",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "api_key": "your-key-here",
+      "base_url": "https://api.moonshot.cn/v1"
+    },
+    "glm": {
+      "label": "GLM (Zhipu)",
+      "api_key_env": "ZHIPU_API_KEY",
+      "api_key": "your-key-here",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4"
+    }
+  }
+}
