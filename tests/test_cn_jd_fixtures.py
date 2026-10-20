@@ -71,5 +71,75 @@ class Item2FalsePositives(FixtureBase):
         self.assertEqual(floored["parsed"]["degree"]["required"], "master")
 
 
+class Item3ScamLexicon(FixtureBase):
+    def test_jd4_rejects_on_fee_and_high_pay_lure(self):
+        report = self.check("jd4_scam")
+        self.assertEqual(report["verdict"], "reject")
+        categories = {item["category"] for item in report["scam"]}
+        self.assertIn("收费", categories)
+        self.assertIn("高薪诱导", categories)
+
+    def test_negation_and_employer_paid_fees_are_not_scams(self):
+        clean = (
+            "公司承担体检费，不收取任何培训费",
+            "公司承担体检费",
+            "公司支付体检费",
+            "提供免费培训",
+            "谨防刷单返利",
+            "不收取任何培训费",
+            "无需支付培训费",
+            "不要下载招聘APP试岗",
+            "当日入职",
+            "按日结算",
+        )
+        for text in clean:
+            with self.subTest(text=text):
+                report = cn_jd_check.check_jd(text)
+                self.assertEqual(report["scam"], [])
+
+    def test_daily_pay_alone_is_slang_not_a_scam(self):
+        report = cn_jd_check.check_jd("日结工资")
+        self.assertEqual(report["scam"], [])
+        self.assertFalse(report["scam_fail"])
+        self.assertNotEqual(report["verdict"], "reject")
+        self.assertEqual(report["jargon"], [{"phrase": "日结", "penalty": 4}])
+
+    def test_lure_needs_both_sides(self):
+        rich = cn_jd_check.check_jd("月入过万")
+        self.assertEqual(rich["scam"], [])
+        self.assertEqual(rich["jargon"], [{"phrase": "月入过万", "penalty": 6}])
+        chat = cn_jd_check.check_jd("加微信详聊")
+        self.assertEqual(chat["scam"], [])
+        self.assertEqual(chat["jargon"], [{"phrase": "加微信详聊", "penalty": 6}])
+        combo = cn_jd_check.check_jd("日结，无需经验")
+        self.assertEqual({item["category"] for item in combo["scam"]}, {"高薪诱导"})
+        self.assertEqual(combo["verdict"], "reject")
+
+    def test_new_scam_categories(self):
+        cases = (
+            ("缴纳298元培训资料费", "收费"),
+            ("先交体检费", "收费"),
+            ("需交工本费", "收费"),
+            ("这是招转培", "招转培"),
+            ("兼职返利", "刷单返利"),
+            ("高额返佣", "刷单返利"),
+            ("绑定银行卡", "盗刷"),
+            ("提供验证码", "盗刷"),
+            ("下载招聘APP试岗", "盗刷"),
+            ("下载APP 试岗", "盗刷"),
+            ("扣押身份证", "扣证件"),
+            ("入职押身份证", "扣证件"),
+        )
+        for text, category in cases:
+            with self.subTest(text=text):
+                found = {item["category"] for item in cn_jd_check.check_jd(text)["scam"]}
+                self.assertIn(category, found)
+
+    def test_plain_fixtures_still_have_no_scam(self):
+        for name in ("jd1_campus", "jd3_social", "jd5_foreign"):
+            with self.subTest(name=name):
+                self.assertEqual(self.check(name)["scam"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

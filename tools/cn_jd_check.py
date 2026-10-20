@@ -117,16 +117,55 @@ SCAM = (
     ("收费入职", ("收费入职", "入职收费", "付费入职", "缴费入职", "有偿入职", "缴纳报名费", "报名费")),
     ("押金", ("入职押金", "服装押金", "风险金", "押金", "保证金", "履约金")),
     ("刷单", ("兼职刷单", "网店刷单", "刷信誉", "刷好评", "刷单")),
+    # Fee nouns need a pay verb in the same clause. An amount may sit between
+    # them ("缴纳298元培训资料费"). 公司承担/支付体检费 is not a demand.
+    ("收费", (
+        "培训资料费", "培训费", "资料费", "教材费",
+        "代理费", "中介费", "介绍费",
+        "服装费", "工装费", "置装费",
+        "体检费", "工本费", "办证费", "建档费",
+    )),
+    ("招转培", ("招聘转培训", "招转培训", "招转培")),
+    # Long form first so "谨防刷单返利" also blocks the inner 返利.
+    ("刷单返利", ("刷单返利", "刷单返佣", "返利", "返佣")),
+    ("盗刷", ("绑定银行卡", "提供验证码", re.compile(r"下载.{0,6}app\s*试岗"))),
+    ("扣证件", ("扣押身份证", "押身份证")),
 )
 SCAM_PENALTY = 30
+_PAY_ONLY = frozenset({"保证金", "风险金", "履约金", "报名费", "押金"})
+_FEE_WORDS = frozenset(
+    phrase for phrase in next(words for name, words in SCAM if name == "收费")
+    if isinstance(phrase, str)
+)
+# Same clause, verb then noun, with room for "298元" / "人民币298元".
+_FEE_VERB = re.compile(r"缴纳|交纳|先交|需交|要交|收取|支付(?!宝)")
+_FEE_COMPANY = re.compile(r"(?:公司|单位|企业|用人单位)$")
+_CLAUSE = "。；;！!？?\n，,"
+
+# One side alone is slang, not a scam. 高薪诱导 needs one bait and one contact.
+# 日入 skips 当日入职; 日结 skips 按日结算. Penalties are the light deductions.
+LURE = (
+    ("月入过万", 6, "bait", None),
+    ("轻松高薪", 6, "bait", None),
+    ("加微信详聊", 6, "hook", re.compile(r"加\s*微信详聊")),
+    ("加qq详聊", 6, "hook", re.compile(r"加\s*qq详聊")),
+    ("无需经验", 4, "hook", None),
+    ("加微信", 4, "hook", re.compile(r"加\s*微信")),
+    ("加qq", 4, "hook", re.compile(r"加\s*qq")),
+    ("私聊", 4, "hook", None),
+    ("日结", 4, "bait", re.compile(r"日结(?!算)")),
+    ("日入", 4, "bait", re.compile(r"日入(?!职)")),
+)
 
 # 免/包/零 waive a following fee ("免押金"). 难免 is not a waiver.
 # 红包/钱包/礼包 are not "the company covers this".
+# Pay verbs are fillers so "不收取任何培训费" and "无需支付培训费" stay waived.
 _NEG = re.compile(
     r"(?:谨防|防范|预防|拒绝|严禁|禁止|杜绝|不要|不用|无需|无须|没有|不存在|从不|"
     r"不收|不收取|不需要|不要求|免收|免费|免除|并非|不是|无|非|未|勿|莫|"
     r"(?<![不难未])免|(?<![红钱礼])包|零|不)"
-    r"(?:任何|形式|的|和|与|及|再|做|搞|收|收取|缴纳|交纳|交|存在|接受|提供|属于|是|有|很){0,3}$"
+    r"(?:任何|形式|的|和|与|及|再|做|搞|收|收取|缴纳|交纳|支付|先交|需交|要交|交|"
+    r"存在|接受|提供|属于|是|有|很){0,3}$"
 )
 
 BUILTIN_CITIES = {
@@ -669,30 +708,112 @@ def _margin_pay(text: str, index: int) -> bool:
     return bool(re.search(r"缴纳|交纳|支付|收取|先交|需交|要交|交满", window))
 
 
-def find_scams(text: str) -> list:
+def _phrase_rank(phrase) -> int:
+    if isinstance(phrase, str):
+        return len(phrase)
+    return 12
+
+
+def _phrase_hits(text: str, phrase):
+    if isinstance(phrase, re.Pattern):
+        for match in phrase.finditer(text):
+            yield match.start(), match.end(), match.group(0)
+        return
+    start = 0
+    while True:
+        index = text.find(phrase, start)
+        if index < 0:
+            return
+        yield index, index + len(phrase), phrase
+        start = index + 1
+
+
+def _fee_demanded(text: str, index: int, end: int) -> bool:
+    """True when the applicant is told to pay this fee.
+
+    Looks inside the same clause. "缴纳298元培训资料费" counts; "公司承担体检费"
+    and "公司支付体检费" do not. A waived verb ("不收取") does not count either.
+    """
+    left = index
+    floor = max(0, index - 24)
+    cursor = index - 1
+    while cursor >= floor:
+        if text[cursor] in _CLAUSE:
+            break
+        left = cursor
+        cursor -= 1
+    right = end
+    for i in range(end, min(len(text), end + 16)):
+        if text[i] in _CLAUSE:
+            break
+        right = i + 1
+    for match in _FEE_VERB.finditer(text, left, right):
+        prefix = text[max(left, match.start() - 8):match.start()]
+        if _FEE_COMPANY.search(prefix):
+            continue
+        if _negated(text, match.start()):
+            continue
+        return True
+    return False
+
+
+def find_lure(text: str) -> list:
+    """Light slang hits. Each item keeps group so 高薪诱导 can require both sides."""
+    occupied = []
     hits = []
-    seen = set()
-    pay_only = {"保证金", "风险金", "履约金", "报名费", "押金"}
-    for category, phrases in SCAM:
-        # "谨防虚假招聘" negates the long form; "假招聘" sits inside that span.
-        blocked = []
-        found = None
-        for phrase in sorted(phrases, key=len, reverse=True):
+    ordered = sorted(LURE, key=lambda item: len(item[0]), reverse=True)
+    for phrase, penalty, group, pattern in ordered:
+        if pattern is not None:
+            spans = [(match.start(), match.end()) for match in pattern.finditer(text)]
+        else:
+            spans = []
             start = 0
             while True:
                 index = text.find(phrase, start)
                 if index < 0:
                     break
-                end = index + len(phrase)
+                spans.append((index, index + len(phrase)))
                 start = index + 1
+        for index, end in spans:
+            if _overlaps(occupied, index, end):
+                continue
+            occupied.append((index, end))
+            if _negated(text, index):
+                continue
+            hits.append({"phrase": phrase, "penalty": penalty, "at": index, "group": group})
+    hits.sort(key=lambda item: item["at"])
+    return hits
+
+
+def _lure_scam(hits: list) -> dict | None:
+    bait = next((item for item in hits if item["group"] == "bait"), None)
+    hook = next((item for item in hits if item["group"] == "hook"), None)
+    if not bait or not hook:
+        return None
+    return {"category": "高薪诱导", "phrase": f"{bait['phrase']}+{hook['phrase']}"}
+
+
+def find_scams(text: str) -> list:
+    hits = []
+    seen = set()
+    for category, phrases in SCAM:
+        # "谨防虚假招聘" negates the long form; "假招聘" sits inside that span.
+        # "谨防刷单返利" likewise blocks the inner 返利 / 返佣.
+        blocked = []
+        found = None
+        ordered = sorted(phrases, key=_phrase_rank, reverse=True)
+        for phrase in ordered:
+            for index, end, label in _phrase_hits(text, phrase):
                 if _overlaps(blocked, index, end):
                     continue
                 if _negated(text, index):
                     blocked.append((index, end))
                     continue
-                if phrase in pay_only and not _margin_pay(text, index):
+                if isinstance(phrase, str) and phrase in _PAY_ONLY and not _margin_pay(text, index):
                     continue
-                found = phrase
+                if isinstance(phrase, str) and phrase in _FEE_WORDS and not _fee_demanded(text, index, end):
+                    continue
+                found = label
                 break
             if found:
                 break
@@ -911,7 +1032,12 @@ def check_jd(text: str, filters: dict | None = None, config_path=None) -> dict:
     # Salary evidence is sliced from the pasted text, which fold() does not resize.
     lowered = folded.lower()
     jargon = find_jargon(lowered)
+    lure = find_lure(lowered)
+    jargon.extend({"phrase": item["phrase"], "penalty": item["penalty"]} for item in lure)
     scams = find_scams(lowered)
+    lure_scam = _lure_scam(lure)
+    if lure_scam:
+        scams.append(lure_scam)
     rows = [
         _eval_degree(degree, filters),
         _eval_school(school, filters),
