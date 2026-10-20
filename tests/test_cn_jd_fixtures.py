@@ -141,5 +141,39 @@ class Item3ScamLexicon(FixtureBase):
                 self.assertEqual(self.check(name)["scam"], [])
 
 
+class Item4Parsing(FixtureBase):
+    def test_jd1_degree_word_before_the_label(self):
+        # "统招全日制本科及以上学历" puts 本科 before 学历.
+        report = self.check("jd1_campus")
+        self.assertEqual(report["parsed"]["degree"]["required"], "bachelor")
+
+    def test_jd2_base_city_without_a_colon(self):
+        report = self.check("jd2_intern")
+        self.assertIn("北京", report["parsed"]["cities"])
+
+    def test_jd5_english_city_degree_and_months(self):
+        report = self.check("jd5_foreign")
+        self.assertIn("上海", report["parsed"]["cities"])
+        self.assertEqual(report["parsed"]["degree"]["required"], "bachelor")
+        self.assertEqual(report["parsed"]["salary"]["months"], 13)
+
+    def test_base_location_and_english_degree_forms(self):
+        known = cn_jd_check.BUILTIN_CITIES
+        self.assertIn("北京", cn_jd_check.parse_cities("Base 北京海淀", known))
+        self.assertIn("北京", cn_jd_check.parse_cities("base北京", known))
+        self.assertIn("上海", cn_jd_check.parse_cities("Location: Shanghai", known))
+        self.assertIn("上海", cn_jd_check.parse_cities("(Shanghai)", known))
+        self.assertEqual(cn_jd_check.parse_degree("统招全日制本科及以上学历")["required"], "bachelor")
+        far = "学历见附件。" + ("其他" * 30) + "须本科及以上"
+        self.assertEqual(cn_jd_check.parse_degree(far)["required"], "bachelor")
+        self.assertEqual(cn_jd_check.parse_degree("学历不限")["required"], "none")
+        self.assertEqual(cn_jd_check.parse_degree("Bachelor's degree or above")["required"], "bachelor")
+        self.assertEqual(cn_jd_check.parse_degree("Master's degree or above")["required"], "master")
+        self.assertEqual(cn_jd_check.parse_degree("PhD")["required"], "doctor")
+        self.assertEqual(cn_jd_check.parse_degree("Doctorate or above")["required"], "doctor")
+        parsed = cn_jd_check.parse_salary("Salary: 40k-60k RMB/month, 13 months + bonus")
+        self.assertEqual(parsed["months"], 13)
+
+
 if __name__ == "__main__":
     unittest.main()

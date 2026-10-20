@@ -70,7 +70,31 @@ _DEGREE_WORD = {
     "高中": "high_school",
     "中专": "high_school",
 }
-_DEGREE_RE = re.compile(r"博士|硕士|研究生|本科|学士|大专|专科|高中|中专")
+# A floor often sits before the label ("本科及以上学历"), so the window
+# reaches about 20 characters on each side. English floors use the same ranks.
+_DEGREE_LABEL_PAD = 20
+_EN_DEGREE = {
+    "bachelor": "bachelor",
+    "bachelors": "bachelor",
+    "master": "master",
+    "masters": "master",
+    "phd": "doctor",
+    "phds": "doctor",
+    "doctorate": "doctor",
+    "doctorates": "doctor",
+}
+_DEGREE_RE = re.compile(
+    r"博士|硕士|研究生|本科|学士|大专|专科|高中|中专|"
+    r"\b(?:doctorates?|phds?|masters?|bachelors?)\b",
+    re.I,
+)
+_DEGREE_LABEL = re.compile(r"(?:学历|学位)(?:要求)?")
+# Forward clause only, for the "学历不限" waiver. The scan window is separate.
+_DEGREE_CLAUSE = re.compile(r"(?:学历|学位)(?:要求)?\s*[：:]?\s*[^。\n；;]{0,60}")
+_DEGREE_ABOVE_EN = re.compile(
+    r"(?:['\u2019]s)?(?:\s+degrees?)?\s+or\s+above\b",
+    re.I,
+)
 
 # Longer phrases first at match time. A hit inside another hit is dropped.
 JARGON = (
@@ -174,10 +198,50 @@ BUILTIN_CITIES = {
     "济南", "大连", "沈阳", "哈尔滨", "昆明", "宁波", "无锡", "东莞", "佛山",
     "珠海", "远程", "全国", "不限",
 }
+# Chinese labels still need ：:在于. "Base 北京" / "base北京" have no colon,
+# so base may be followed by whitespace only. Location: Shanghai is the
+# English form of the same label.
 _CITY_LABEL = re.compile(
-    r"(?:工作地点|工作城市|工作地|办公地点|办公城市|坐标|城市|地点|base)\s*[：:在于]\s*([^\n。；;]{1,40})",
+    r"(?:"
+    r"(?:工作地点|工作城市|工作地|办公地点|办公城市|坐标|城市|地点|(?<![A-Za-z])location)"
+    r"\s*[：:在于]"
+    r"|(?<![A-Za-z])base\s*[：:在于]?"
+    r")\s*([^\n。；;]{1,40})",
     re.I,
 )
+# English names only apply to a token already cut out as a place (a label
+# value or a title parenthetical). They are not scanned in free prose.
+_EN_CITIES = {
+    "beijing": "北京",
+    "shanghai": "上海",
+    "shenzhen": "深圳",
+    "guangzhou": "广州",
+    "hangzhou": "杭州",
+    "chengdu": "成都",
+    "nanjing": "南京",
+    "wuhan": "武汉",
+    "xian": "西安",
+    "xi'an": "西安",
+    "suzhou": "苏州",
+    "tianjin": "天津",
+    "chongqing": "重庆",
+    "changsha": "长沙",
+    "zhengzhou": "郑州",
+    "qingdao": "青岛",
+    "hefei": "合肥",
+    "xiamen": "厦门",
+    "fuzhou": "福州",
+    "jinan": "济南",
+    "dalian": "大连",
+    "shenyang": "沈阳",
+    "harbin": "哈尔滨",
+    "kunming": "昆明",
+    "ningbo": "宁波",
+    "wuxi": "无锡",
+    "dongguan": "东莞",
+    "foshan": "佛山",
+    "zhuhai": "珠海",
+}
 _HEAD_CITY = re.compile(r"[【\[（(]([^】\]）)\n]{1,12})[】\]）)]")
 _REMOTE = re.compile(r"远程办公|可远程|支持远程|居家办公|远程工作")
 _OPEN_LOCATION = re.compile(r"(?:工作地点|工作城市|地点|城市)\s*不限|地点不限")
@@ -213,7 +277,8 @@ _SALARY_SINGLE = re.compile(
     r"(?:\s*/\s*(?P<period>月|年))?"
 )
 _MONTHS_TAIL = re.compile(r"^\s*(?:[·*x×/／]|（|\()?\s*(?P<m>\d{1,2})\s*薪\s*[）)]?")
-_MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})\s*薪")
+# "13 months" is a pay count, same as 13薪. "RMB/month" has no number in front.
+_MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})\s*(?:薪|months?\b)", re.I)
 _HUKOU = re.compile(r"(?P<prefix>.{0,12})(?P<kind>户口|户籍)")
 
 NOTE = "Pasted JD only. Does not scrape, greet, or apply."
@@ -331,7 +396,42 @@ def _norm_city(name: str) -> str:
         if name.endswith(suffix) and len(name) > len(suffix):
             name = name[: -len(suffix)]
             break
+    mapped = _EN_CITIES.get(name.lower())
+    if mapped:
+        return mapped
     return name
+
+
+def _degree_level(word: str) -> str:
+    if word in _DEGREE_WORD:
+        return _DEGREE_WORD[word]
+    return _EN_DEGREE[word.lower()]
+
+
+def _degree_regions(text: str) -> list:
+    """Windows around 学历/学位, or the whole JD when that misses.
+
+    The label window covers about 20 characters on each side, because
+    "本科及以上学历" puts the floor before the label. A window with no
+    degree word falls back to the full text. A pure waiver ("学历不限")
+    still scans the rest of the JD for a real floor.
+    """
+    labels = list(_DEGREE_LABEL.finditer(text))
+    if not labels:
+        return [(text, 0)]
+    regions = []
+    for match in labels:
+        start = max(0, match.start() - _DEGREE_LABEL_PAD)
+        end = min(len(text), match.end() + _DEGREE_LABEL_PAD)
+        regions.append((text[start:end], start))
+    clauses = list(_DEGREE_CLAUSE.finditer(text))
+    waiver = bool(clauses) and all(
+        "不限" in clause.group(0) and not re.search(r"及以上|以上", clause.group(0))
+        for clause in clauses
+    )
+    if waiver or not any(_DEGREE_RE.search(region) for region, _offset in regions):
+        return [(text, 0)]
+    return regions
 
 
 def _known_cities(filters: dict) -> set:
@@ -373,12 +473,7 @@ def _unique(items) -> list:
 
 
 def parse_degree(text: str) -> dict:
-    # Prefer a labeled 学历/学位 clause. If that clause is only a waiver
-    # ("学历不限"), keep scanning the rest of the JD for a real floor.
-    labeled = list(re.finditer(r"(?:学历|学位)(?:要求)?\s*[：:]?\s*[^。\n；;]{0,60}", text))
-    regions = [(m.group(0), m.start()) for m in labeled] or [(text, 0)]
-    if labeled and all("不限" in m.group(0) and not re.search(r"及以上|以上", m.group(0)) for m in labeled):
-        regions = [(text, 0)]
+    regions = _degree_regions(text)
     floors = []
     bare = []
     evidence = ""
@@ -399,11 +494,14 @@ def parse_degree(text: str) -> dict:
             after = region[match.end():match.end() + 8]
             if re.search(r"优先|为佳|加分|最好", after):
                 continue
-            above_match = re.match(r"\s*(?:及)?以上", after)
+            # "及以上" is the Chinese floor. "Bachelor's degree or above" is
+            # the same mark; the extra words sit further out than 8 characters.
+            tail = region[match.end():match.end() + 32]
+            above_match = re.match(r"\s*(?:及)?以上", tail) or _DEGREE_ABOVE_EN.match(tail)
             above = above_match is not None
             extra = above_match.end() if above_match else 0
             snippet = text[absolute:absolute + len(match.group(0)) + extra]
-            required.append((DEGREE_RANK[_DEGREE_WORD[match.group(0)]], above, snippet))
+            required.append((DEGREE_RANK[_degree_level(match.group(0))], above, snippet))
         if not required:
             continue
         if any(item[1] for item in required):
