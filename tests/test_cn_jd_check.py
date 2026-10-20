@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.parse import urlparse
 
 REPO = Path(__file__).resolve().parent.parent
 TOOL = REPO / "tools" / "cn_jd_check.py"
@@ -147,6 +148,77 @@ class CheckJd(unittest.TestCase):
         raised = cn_jd_check.check_jd("学历：硕士及以上", master)
         self.assertEqual(_row(raised, "degree")["status"], "pass")
         self.assertEqual(raised["parsed"]["degree"]["required"], "master")
+
+    def test_annual_package_without_months_is_a_zero_penalty_hint(self):
+        for text in ("年薪30万", "年薪30-40万", "年包30万", "年包30-40万"):
+            for filters in ({}, {"salary": {"min_monthly_k": 20, "min_months": 14}}):
+                with self.subTest(text=text, filters=filters):
+                    report = cn_jd_check.check_jd(text, filters)
+                    salary = report["parsed"]["salary"]
+                    self.assertTrue(salary["annual"])
+                    self.assertEqual(salary["min_monthly_k"], 25)
+                    self.assertIsNone(salary["months"])
+                    result = _row(report, "salary")
+                    self.assertEqual(result["codes"], ["annual_months_unstated"])
+                    self.assertIn("年包，未写薪数，建议问清几薪、年终奖是否保底", result["detail"])
+                    self.assertEqual(result["status"], "flag")
+                    self.assertEqual(report["verdict"], "caution")
+                    self.assertEqual(report["score"], 100)
+                    self.assertFalse(report["hard_fail"])
+
+    def test_annual_stated_months_and_monthly_pay_do_not_warn(self):
+        for text, months in (("年薪30万，13薪", 13), ("年包30-40万·14-16薪", 14),
+                             ("年包30万，14-16薪", 14), ("月薪20-30K", None),
+                             ("月薪20K·13薪", 13), ("薪资面议", None)):
+            with self.subTest(text=text):
+                report = cn_jd_check.check_jd(text, {})
+                self.assertEqual(report["parsed"]["salary"]["months"], months)
+                self.assertNotIn("annual_months_unstated", _row(report, "salary")["codes"])
+                self.assertEqual(report["verdict"], "pass")
+        below = cn_jd_check.check_jd("年包12万", {"salary": {"min_monthly_k": 20}})
+        self.assertTrue(below["hard_fail"])
+        self.assertEqual(_row(below, "salary")["codes"], ["salary_below_floor", "annual_months_unstated"])
+
+    def test_variable_pay_hints_and_explicit_monthly_performance(self):
+        for text in ("底薪8K+提成", "无责底薪8000元+绩效", "保底8K+业绩提成",
+                     "薪资8K+佣金", "月薪20K（含绩效）", "月薪由基本工资+绩效组成",
+                     "底薪+提成", "保底8000元", "底薪面议+提成", "月薪20K，提成另算",
+                     "薪资：基本工资6K+绩效2K"):
+            with self.subTest(text=text):
+                report = cn_jd_check.check_jd(text, {})
+                self.assertTrue(report["parsed"]["salary"]["variable_pay"])
+                result = _row(report, "salary")
+                self.assertEqual(result["codes"], ["base_plus_commission"])
+                self.assertIn("底薪+提成：到手不确定，问清底薪、提成规则和发放周期", result["detail"])
+                self.assertEqual(result["status"], "flag")
+                self.assertEqual(report["verdict"], "caution")
+                self.assertFalse(report["hard_fail"])
+                self.assertEqual(report["score"], 100)
+
+    def test_variable_pay_floor_uses_base_instead_of_total_or_commission(self):
+        for text in ("底薪8K+提成", "综合月薪20-30K，底薪8K+提成",
+                     "提成10-20K，底薪8K", "底薪6-8K+提成20K", "保底8K，综合月薪30K",
+                     "底薪8K+2K绩效", "薪资：基本工资8K+绩效2K"):
+            with self.subTest(text=text):
+                report = cn_jd_check.check_jd(text, {"salary": {"min_monthly_k": 10}})
+                self.assertEqual(report["parsed"]["salary"]["max_monthly_k"], 8)
+                self.assertEqual(_row(report, "salary")["status"], "fail")
+                self.assertEqual(_row(report, "salary")["codes"], ["salary_below_floor", "base_plus_commission"])
+                self.assertTrue(report["hard_fail"])
+        boundary = cn_jd_check.check_jd("底薪10K+佣金", {"salary": {"min_monthly_k": 10}})
+        self.assertFalse(boundary["hard_fail"])
+        self.assertEqual(_row(boundary, "salary")["codes"], ["base_plus_commission"])
+
+    def test_fixed_salary_and_performance_duties_do_not_imply_variable_pay(self):
+        for text in ("月薪20-30K·14薪，福利：绩效奖金", "固定月薪20K，另有绩效奖金",
+                     "薪资20K\n负责绩效考核和业绩分析", "月薪20K。负责佣金结算系统开发",
+                     "负责提成规则制定", "保底双休", "薪资20K，无提成", "月薪20K，不含绩效",
+                     "月薪20K不含绩效", "月薪20K（不包含绩效奖金）"):
+            with self.subTest(text=text):
+                report = cn_jd_check.check_jd(text, {})
+                self.assertFalse(report["parsed"]["salary"]["variable_pay"])
+                self.assertNotIn("base_plus_commission", _row(report, "salary")["codes"])
+                self.assertEqual(report["verdict"], "pass")
 
     def test_hard_filters_reject_degree_school_age_city_hukou_salary(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -429,6 +501,26 @@ class LaborCheck(unittest.TestCase):
 
     def hits(self, report, name):
         return [hit for hit in report["labor"] if hit["name"] == name]
+
+    def test_every_labor_hit_has_official_sources_for_each_cited_article(self):
+        report = self.check("试用期4个月，试用期一年，试用期工资70%，不交公积金，六险二金，人力外包，不签劳动合同")
+        expected = {
+            "probation_months": {"《劳动合同法》第十九条"},
+            "probation_pay_ratio": {"《劳动合同法》第二十条"},
+            "contract": {"《劳动合同法》第十条"},
+            "outsourcing": {"《劳动合同法》第五十九条", "《劳动合同法》第六十六条", "《劳务派遣暂行规定》第四条"},
+            "social_insurance": {"《社会保险法》第五十八条", "《社会保险法》第六十条", "《住房公积金管理条例》第二十条"},
+        }
+        self.assertEqual({hit["name"] for hit in report["labor"]}, set(expected))
+        for hit in report["labor"]:
+            self.assertEqual(set(hit["source_urls"]), expected[hit["name"]])
+            for url in hit["source_urls"].values():
+                parsed = urlparse(url)
+                self.assertEqual(parsed.scheme, "https")
+                self.assertTrue(any(parsed.hostname == domain or parsed.hostname.endswith("." + domain)
+                                    for domain in ("gov.cn", "samr.gov.cn")), url)
+        student = self.check("不签劳动合同", {"labor": {"candidate_is_student": True}})
+        self.assertEqual(set(student["labor"][0]["source_urls"]), expected["contract"])
 
     def test_probation_months_boundaries_and_chinese_units(self):
         for text, months, status in (

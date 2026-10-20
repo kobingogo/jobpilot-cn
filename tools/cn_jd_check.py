@@ -59,6 +59,25 @@ LABOR_BASIS = {
     "outsourcing": "《劳动合同法》第五十九条（派遣单位与用工单位订立劳务派遣协议）、第六十六条（劳务派遣只能在临时性、辅助性或者替代性的工作岗位上实施）；《劳务派遣暂行规定》第四条（派遣用工数量不得超过其用工总量的10%）。",
     "social_insurance": "《社会保险法》第五十八条（用人单位应当自用工之日起三十日内为其职工申请办理社会保险登记）、第六十条（用人单位应当自行申报、按时足额缴纳社会保险费）；《住房公积金管理条例》第二十条（单位应当按时、足额缴存住房公积金）。",
 }
+# Article-level links retain the supplied citation wording and distinguish the
+# amended texts from older originals. Each hit carries all articles it cites.
+_CONTRACT_SOURCE = "https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/bgt/art/2023/art_0abfdd261c03417b949df19d869add8d.html"
+_INSURANCE_SOURCE = "https://www.gov.cn/guoqing/2021-10/29/content_5647616.htm"
+LABOR_SOURCES = {
+    "probation_months": {"《劳动合同法》第十九条": _CONTRACT_SOURCE},
+    "probation_pay_ratio": {"《劳动合同法》第二十条": _CONTRACT_SOURCE},
+    "contract": {"《劳动合同法》第十条": _CONTRACT_SOURCE},
+    "outsourcing": {
+        "《劳动合同法》第五十九条": _CONTRACT_SOURCE,
+        "《劳动合同法》第六十六条": _CONTRACT_SOURCE,
+        "《劳务派遣暂行规定》第四条": "https://www.gov.cn/zhengce/2022-08/31/content_5711309.htm",
+    },
+    "social_insurance": {
+        "《社会保险法》第五十八条": _INSURANCE_SOURCE,
+        "《社会保险法》第六十条": _INSURANCE_SOURCE,
+        "《住房公积金管理条例》第二十条": "https://www.gov.cn/zhengce/zhengceku/202608/content_7078478.htm",
+    },
+}
 
 _WIDTH = str.maketrans({
     "０": "0", "１": "1", "２": "2", "３": "3", "４": "4",
@@ -317,9 +336,11 @@ _COHORT = re.compile(
     r"(?<!\d)(?P<first>20\d{2}|\d{2})\s*届?\s*"
     r"(?:[-~至到/、]\s*(?P<last>20\d{2}|\d{2})\s*)?届"
 )
-_MONTHS_TAIL = re.compile(r"^\s*(?:[·*x×/／]|（|\()?\s*(?P<m>\d{1,2})\s*薪\s*[）)]?")
+_MONTHS_TAIL = re.compile(r"^\s*(?:[·*x×/／]|（|\()?\s*(?P<m>\d{1,2})(?:\s*[-~到至]\s*\d{1,2})?\s*薪\s*[）)]?")
 # "13 months" is a pay count, same as 13薪. "RMB/month" has no number in front.
-_MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})\s*(?:薪|months?\b)", re.I)
+_MONTHS_ANY = re.compile(r"(?<!\d)(\d{1,2})(?:\s*[-~到至]\s*\d{1,2})?\s*(?:薪|months?\b)", re.I)
+_BASE_PAY = re.compile(r"(?:无责底薪|底薪|保底|基本工资|固定工资)\s*[:：为是]?\s*$")
+_VARIABLE_PAY = re.compile(r"无责底薪|底薪|保底|提成|佣金")
 _HUKOU = re.compile(r"(?P<prefix>.{0,12})(?P<kind>户口|户籍)")
 
 _CN_DIGITS = "零一二三四五六七八九"
@@ -768,7 +789,7 @@ def _is_annual(text: str, start: int, period) -> bool:
     if period == "月":
         return False
     before = text[max(0, start - 8):start]
-    if "年薪" in before or "年收入" in before or "包年" in before:
+    if any(label in before for label in ("年薪", "年包", "年收入", "包年")):
         return True
     return False
 
@@ -783,6 +804,31 @@ def _months_near(text: str, end: int):
     return None, end
 
 
+def _variable_pay(text: str) -> bool:
+    """Pay context only; ordinary performance bonuses and duties are not pay composition."""
+    for clause in re.split(r"[。；;！!？?\n，,]", text):
+        for match in _VARIABLE_PAY.finditer(clause):
+            if _negated(clause, match.start()):
+                continue
+            window = clause[max(0, match.start() - 24):match.end() + 24]
+            if (_SALARY_SINGLE.search(window) or _SHORT_PAY.search(window)
+                    or re.search(r"薪资|薪酬|工资|月薪|年薪|年包", window)
+                    or re.search(r"(?:底薪|保底)\s*(?:面议)?\s*\+\s*(?:绩效|提成|佣金)", window)
+                    or re.search(r"(?:提成|佣金)\s*(?:另算|另计|另发|按业绩|按月发放)", window)):
+                return True
+        # 绩效 must explicitly compose monthly pay. 福利：绩效奖金 alone,
+        # or a performance-related responsibility, does not satisfy this.
+        if ("绩效" in clause and not _negated(clause, clause.index("绩效"))
+                and not re.search(r"(?:不含|不包含|不包括|不计入)\s*绩效", clause)):
+            if re.search(r"(?:基本工资|固定工资)[^。；;\n]{0,16}\+\s*绩效", clause):
+                return True
+            if re.search(r"月薪|月工资|月度薪资|每月薪资", clause) and re.search(
+                r"(?:含|包含|包括|\+|组成|构成|由)[^。；;\n]{0,16}绩效|绩效[^。；;\n]{0,16}(?:组成|构成|占)", clause
+            ):
+                return True
+    return False
+
+
 def parse_salary(text: str, original: str | None = None) -> dict:
     empty = {
         "period": None,
@@ -794,6 +840,7 @@ def parse_salary(text: str, original: str | None = None) -> dict:
         "max_monthly_k": None,
         "months": None,
         "annual": False,
+        "variable_pay": _variable_pay(text),
         "evidence": "",
     }
     source = original if original is not None and len(original) == len(text) else text
@@ -827,15 +874,26 @@ def parse_salary(text: str, original: str | None = None) -> dict:
             low, high = high, low
         months, stop = _months_near(text, match.end())
         candidates.append((high, low, months, annual, match.start(), stop))
-    if not candidates:
-        for match in _SALARY_SINGLE.finditer(text):
-            annual = _is_annual(text, match.start(), match.group("period"))
-            amount = _monthly_k(float(match.group("min")), match.group("u"), annual)
-            if amount is None:
-                continue
-            months, stop = _months_near(text, match.end())
-            high = None if match.group("open") else amount
-            candidates.append((high, amount, months, annual, match.start(), stop))
+    ranges = [(item[4], item[5]) for item in candidates]
+    for match in _SALARY_SINGLE.finditer(text):
+        if _overlaps(ranges, match.start(), match.end()):
+            continue
+        if ranges and not _BASE_PAY.search(text[max(0, match.start() - 12):match.start()]):
+            # Preserve the existing preference for salary ranges over other
+            # standalone amounts, except when a base needs its own comparison.
+            continue
+        annual = _is_annual(text, match.start(), match.group("period"))
+        amount = _monthly_k(float(match.group("min")), match.group("u"), annual)
+        if amount is None:
+            continue
+        months, stop = _months_near(text, match.end())
+        composition = match.group("open") == "+" and re.match(
+            r"\s*(?:提成|佣金|绩效|业绩|奖金|补贴|\d)", text[match.end():]
+        )
+        high = None if match.group("open") and not composition else amount
+        if composition and stop == match.end():
+            stop -= 1  # '+' introduces the next component, not an open base.
+        candidates.append((high, amount, months, annual, match.start(), stop))
     if not candidates:
         if "面议" in text:
             return {**empty, "evidence": "面议"}
@@ -844,7 +902,11 @@ def parse_salary(text: str, original: str | None = None) -> dict:
     def high_key(item):
         return item[0] if item[0] is not None else 10**9
 
-    _high, low, months, annual, start, stop = max(candidates, key=high_key)
+    # A quoted total or commission band must not replace the stated base when
+    # checking the floor. Do not add performance/commission amounts to it.
+    bases = [item for item in candidates if empty["variable_pay"]
+             and _BASE_PAY.search(text[max(0, item[4] - 12):item[4]])]
+    _high, low, months, annual, start, stop = max(bases or candidates, key=high_key)
     source = original if original is not None and len(original) == len(text) else text
     if len(candidates) == 1 and months is None:
         found = [int(m.group(1)) for m in _MONTHS_ANY.finditer(text) if 12 <= int(m.group(1)) <= 24]
@@ -1163,6 +1225,7 @@ def _probation_months(duration: str) -> float:
 def _labor_hit(name, status, evidence, detail, code, value=None, risk=True) -> dict:
     hit = _row(name, status, evidence, f"{detail}。{LABOR_NOTE}", [code])
     hit["legal_basis"] = LABOR_BASIS[name]
+    hit["source_urls"] = dict(LABOR_SOURCES[name])
     hit["risk"] = risk
     if value is not None:
         hit["value"] = _round_num(value)
@@ -1393,6 +1456,22 @@ def _eval_hukou(parsed: dict, cities: list, filters: dict) -> dict:
 
 
 def _eval_salary(parsed: dict, filters: dict) -> dict:
+    row = _eval_salary_thresholds(parsed, filters)
+    hints = []
+    if parsed["annual"] and parsed["months"] is None:
+        row["codes"].append("annual_months_unstated")
+        hints.append("年包，未写薪数，建议问清几薪、年终奖是否保底")
+    if parsed["variable_pay"]:
+        row["codes"].append("base_plus_commission")
+        hints.append("底薪+提成：到手不确定，问清底薪、提成规则和发放周期")
+    if hints:
+        row["detail"] = "；".join([row["detail"], *hints])
+        if row["status"] != "fail":
+            row["status"] = "flag"
+    return row
+
+
+def _eval_salary_thresholds(parsed: dict, filters: dict) -> dict:
     section = _section(filters, "salary")
     if parsed.get("period") in {"day", "hour", "mixed"}:
         if parsed["period"] != "day":

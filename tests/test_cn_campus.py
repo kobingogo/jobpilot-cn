@@ -63,10 +63,11 @@ class CampusScoring(unittest.TestCase):
         self.assertFalse(unknown['hard_fail'])
 
     def test_monthly_annual_hourly_and_mixed_are_separate(self):
-        for text, period in (('校招20-30K·14薪', 'month'), ('校招年薪30-40万', 'year')):
+        for text, period, status in (('校招20-30K·14薪', 'month', 'pass'),
+                                     ('校招年薪30-40万', 'year', 'flag')):
             report = self.check(text)
             self.assertEqual(report['parsed']['salary']['period'], period)
-            self.assertEqual(row(report, 'salary')['status'], 'pass')
+            self.assertEqual(row(report, 'salary')['status'], status)
         hourly = self.check('实习1000元/小时')
         self.assertEqual(hourly['parsed']['salary']['period'], 'hour')
         self.assertEqual(hourly['parsed']['salary']['min_hourly'], 1000)
