@@ -15,60 +15,8 @@
   \PackageError{cnresume}{ctex is required. Load ctexart before cnresume}{}%
 }{}
 
-% Noto CJK embeds a ToUnicode map, so pypdf (the extractor /apply tries first)
-% reads the Chinese text layer. Fandol, ctex's usual default, compiles from
-% texlive-lang-chinese alone but pypdf returns mojibake for the same page.
-% \IfFontExistsTF sees the fontconfig family. XeTeX still opens the OTC at
-% index 0 (Japanese), so the faces below name the .ttc and FontIndex=2 (SC).
-% Bold is the Bold collection. Language selects Simplified Chinese locl glyphs.
-% The shared CFF table is still named Noto*CJKjp, so pdffonts may not say CJKsc.
-\IfFontExistsTF{Noto Serif CJK SC}{%
-  \setCJKmainfont{NotoSerifCJK-Regular.ttc}[%
-    FontIndex=2,%
-    Script=CJK,%
-    Language={Chinese Simplified},%
-    BoldFont={NotoSerifCJK-Bold.ttc}%
-  ]%
-  \setCJKsansfont{NotoSansCJK-Regular.ttc}[%
-    FontIndex=2,%
-    Script=CJK,%
-    Language={Chinese Simplified},%
-    BoldFont={NotoSansCJK-Bold.ttc}%
-  ]%
-  \setCJKmonofont{NotoSansCJK-Regular.ttc}[%
-    FontIndex=2,%
-    Script=CJK,%
-    Language={Chinese Simplified}%
-  ]%
-  \setCJKfamilyfont{zhsong}{NotoSerifCJK-Regular.ttc}[%
-    FontIndex=2,%
-    Script=CJK,%
-    Language={Chinese Simplified},%
-    BoldFont={NotoSerifCJK-Bold.ttc}%
-  ]%
-  \setCJKfamilyfont{zhhei}{NotoSansCJK-Regular.ttc}[%
-    FontIndex=2,%
-    Script=CJK,%
-    Language={Chinese Simplified},%
-    BoldFont={NotoSansCJK-Bold.ttc}%
-  ]%
-}{%
-  \PackageWarning{cnresume}{%
-    Noto Serif CJK SC was not found. Falling back to Fandol.\MessageBreak
-    The page still compiles, but pypdf cannot read Fandol's Chinese text layer.\MessageBreak
-    Install fonts-noto-cjk and recompile. Do not rewrite the resume to match the garbage%
-  }%
-  \setCJKmainfont{FandolSong-Regular.otf}[%
-    BoldFont=FandolSong-Bold.otf,%
-    ItalicFont=FandolKai-Regular.otf%
-  ]%
-  \setCJKsansfont{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]%
-  \setCJKmonofont{FandolFang-Regular.otf}%
-  \setCJKfamilyfont{zhsong}{FandolSong-Regular.otf}[%
-    BoldFont=FandolSong-Bold.otf%
-  ]%
-  \setCJKfamilyfont{zhhei}{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]%
-}
+% Shared with Chinese cover letters; includes Windows/macOS font fallbacks.
+\RequirePackage{cnfonts}
 
 \RequirePackage{geometry}
 \RequirePackage{xcolor}

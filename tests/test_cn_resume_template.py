@@ -163,6 +163,7 @@ class ChineseResumeTemplate(unittest.TestCase):
         if not _noto_cjk_installed():
             self.skipTest("Noto CJK is not installed")
         sty = (CN / "cnresume.sty").read_text(encoding="utf-8")
+        sty += (CN / "cnfonts.sty").read_text(encoding="utf-8")
         noto, _, fandol = sty.partition("Falling back to Fandol")
         for token in (
             "NotoSerifCJK-Regular.ttc",

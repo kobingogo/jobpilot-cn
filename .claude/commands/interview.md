@@ -4,6 +4,8 @@ You are preparing the user for a real, scheduled interview on one of their appli
 
 `/apply` optimizes what the company reads; `/interview` optimizes what the company hears. The bridge between them is consistency: the interviewer has read the submitted CV and cover letter, so everything prepared here must match what those documents claim.
 
+**Language:** use the user's conversation language for questions, prep packs, mock-interview feedback and closing messages. For Chinese users, translate the fixed English prompts below and use Chinese headings; preserve file paths and technical keywords. Unknown facts remain「待确认」.
+
 Follow these steps **in order**.
 
 ---

@@ -155,6 +155,19 @@ Escape these wherever they appear in body text:
 - Dollar: `\$`, hash: `\#`, underscore: `\_`
 - Tilde: `\textasciitilde{}`, caret: `\textasciicircum{}`, backslash: `\textbackslash{}`
 
+### Chinese cover letters (中文求职信)
+
+For a Chinese posting, keep `cover.cls` and its compile command, but add these lines immediately after `\documentclass[]{cover}` in the generated source:
+
+```latex
+\usepackage[fontset=none]{ctex}
+\usepackage{../templates/cn/cnfonts}
+```
+
+Compile from `cover_letters/`, where the shared font path and `OpenFonts/` resolve. Do not load `cnresume.sty` here: its geometry and résumé macros do not belong in the letter. This applies even when the CV uses an active custom template; an active custom **cover** template follows its own verified CJK setup instead. XeLaTeX/fontspec alone does not render Chinese: a successful exit can still produce a blank letter. Check the `.log` for `Missing character`, then extract with `pdftotext -layout -enc UTF-8` and confirm the name, salutation and Chinese body survive. Fix the font setup and recompile if they do not.
+
+Use「您好：」when the addressee is unknown, or a confirmed name with「老师／招聘团队」as appropriate. Date and closing are Chinese; do not assume a current employer or current salary for students. Keep the same Latin body/bullet font wrapper and let xeCJK supply the Chinese font. Count Chinese prose by characters if a portal sets a 字数 limit; do not enforce the English 250–300 word budget by padding Chinese text.
+
 ### Non-English Cover Letters
 - Same template structure, just write content in the posting's language
 - Adjust date format to local convention

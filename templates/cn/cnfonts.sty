@@ -1,0 +1,83 @@
+% Shared CJK font selection; no resume geometry or header macros.
+% Load ctexart/ctex with fontset=none before this package, using xelatex.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{cnfonts}[2026/10/21 Chinese fonts for resumes and cover letters]
+\RequirePackage{iftex}
+\RequireXeTeX
+\RequirePackage{xeCJK}
+\newcommand{\cnfontpair}[2]{%
+  \setCJKmainfont{#1}%
+  \setCJKsansfont{#2}%
+  \setCJKmonofont{#2}%
+  \setCJKfamilyfont{zhsong}{#1}%
+  \setCJKfamilyfont{zhhei}{#2}%
+}
+% Noto CJK embeds a ToUnicode map, so pypdf (the extractor /apply tries first)
+% reads the Chinese text layer. Fandol, ctex's usual default, compiles from
+% texlive-lang-chinese alone but pypdf returns mojibake for the same page.
+% \IfFontExistsTF sees the fontconfig family. XeTeX still opens the OTC at
+% index 0 (Japanese), so the faces below name the .ttc and FontIndex=2 (SC).
+% Bold is the Bold collection. Language selects Simplified Chinese locl glyphs.
+% The shared CFF table is still named Noto*CJKjp, so pdffonts may not say CJKsc.
+\IfFontExistsTF{NotoSerifCJK-Regular.ttc}{%
+  \setCJKmainfont{NotoSerifCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSerifCJK-Bold.ttc}%
+  ]%
+  \setCJKsansfont{NotoSansCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSansCJK-Bold.ttc}%
+  ]%
+  \setCJKmonofont{NotoSansCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified}%
+  ]%
+  \setCJKfamilyfont{zhsong}{NotoSerifCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSerifCJK-Bold.ttc}%
+  ]%
+  \setCJKfamilyfont{zhhei}{NotoSansCJK-Regular.ttc}[%
+    FontIndex=2,%
+    Script=CJK,%
+    Language={Chinese Simplified},%
+    BoldFont={NotoSansCJK-Bold.ttc}%
+  ]%
+}{%
+  \IfFontExistsTF{Noto Serif CJK SC}{%
+    \cnfontpair{Noto Serif CJK SC}{Noto Sans CJK SC}% OTF installations
+  }{\IfFontExistsTF{SimSun}{%
+    \IfFontExistsTF{Microsoft YaHei}{%
+      \cnfontpair{SimSun}{Microsoft YaHei}% Windows
+    }{\cnfontpair{SimSun}{SimSun}}%
+  }{\IfFontExistsTF{Songti SC}{%
+    \IfFontExistsTF{PingFang SC}{%
+      \cnfontpair{Songti SC}{PingFang SC}% macOS
+    }{\cnfontpair{Songti SC}{Songti SC}}%
+  }{\IfFontExistsTF{PingFang SC}{%
+    \cnfontpair{PingFang SC}{PingFang SC}% macOS minimal font set
+  }{%
+  \PackageWarning{cnresume}{%
+    No Noto, SimSun/YaHei or Songti/PingFang font was found. Falling back to Fandol.\MessageBreak
+    The page still compiles, but pypdf cannot read Fandol's Chinese text layer.\MessageBreak
+    Install Noto CJK (fonts-noto-cjk on Debian/Ubuntu), then recompile.
+    Verify Chinese text with pdftotext -enc UTF-8; do not rewrite the source%
+  }%
+  \setCJKmainfont{FandolSong-Regular.otf}[%
+    BoldFont=FandolSong-Bold.otf,%
+    ItalicFont=FandolKai-Regular.otf%
+  ]%
+  \setCJKsansfont{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]%
+  \setCJKmonofont{FandolFang-Regular.otf}%
+  \setCJKfamilyfont{zhsong}{FandolSong-Regular.otf}[%
+    BoldFont=FandolSong-Bold.otf%
+  ]%
+  \setCJKfamilyfont{zhhei}{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]%
+}%
+  }}}}% native/OTF fallbacks
