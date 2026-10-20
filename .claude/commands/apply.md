@@ -61,6 +61,8 @@ JD
 
 The script reads that text only (default config). It does not fetch, scrape, greet, or apply, and a URL inside the JD is not a page to open. Do not write personal data into the config. Subtract `jargon_penalty` and `scam_penalty` from the weighted overall fit score (floor 0). A `hard_fail` or `scam_fail` **blocks** the score: recommend skip, quote the failing filter rows or scam phrases, and do not draft unless the user explicitly says to go on. Jargon alone lowers the score; it does not block.
 
+For `Career stage: campus / intern` (校招/实习) in the profile, evaluate experience using relevant coursework, projects, internships, competitions and campus contributions, following `04-job-evaluation.md`. Do not lower the score solely for having no full-time employer, and do not turn project time into employment years. Confirm missing student status or cohort facts; do not silently replace them from the JD. The checker uses `campus.mode`, `campus.graduation_year`, `labor.candidate_is_student` and `salary.min_daily` from the user's config populated by `/setup`; `parsed.campus` identifies JD mode. Daily pay is compared only with the daily threshold, not monthly salary or pay-month counts. Labor rows remain risk hints and never veto.
+
 ### Source Host Verification (when input is a URL)
 
 Before proceeding to drafting, inspect the posting URL's hostname to verify provenance (#431). Classify the host into one of three categories:
@@ -106,6 +108,8 @@ Read only the reference files you do not yet have:
 
 **Chinese one-page résumé (`templates/cn/`):** if no `ACTIVE-TEMPLATE` block is present and the profile's `CV language` is 中文 (`Chinese` and `zh` count), or the user asks in this turn for the one-page Chinese résumé, draft the CV from `templates/cn/resume.tex` instead of moderncv. Read `templates/cn/README.md` and the Chinese section of `05-cv-templates.md` first. Then `<CV_EXT>` stays `.tex`, `<CV_COMPILE>` is the xelatex command in that README (ctex/xeCJK, not lualatex), and the CV page limit is exactly 1. An `ACTIVE-TEMPLATE` block still wins. `templates/cn/example.tex` is a 虚构 layout sample, not a person and not a fact source: do not copy its employers, dates, or numbers. Leave `\cnphoto` commented out unless the profile or the user turns the photo on; never invent a portrait and never commit the image. The cover letter does not change: posting language, `cover.cls` or the active cover template, exactly 1 page. The posting is still pasted by hand. This template does not scrape job sites and does not greet or submit. Copy-paste outreach, when the subsection below writes it, is a separate unsent file.
 
+**Campus variant within the Chinese selection above:** if `Career stage: campus / intern` (校招/实习) is recorded in `CLAUDE.md` / `01-candidate-profile.md`, select `templates/cn/campus/resume.tex` as the skeleton instead of `templates/cn/resume.tex`. If stage is absent but the profile explicitly says 在读/应届 and is seeking campus/intern roles, confirm and record the stage before drafting. A JD alone must not relabel the candidate. Read `templates/cn/campus/README.md`. Keep education first, then internships, projects, campus/competitions/scholarships, skills. GPA/ranking are optional; remove absent sections, never invent a current employer. Its shared style, xelatex compile command, photo-off default and exactly 1 page rule are the same as `templates/cn/`. `ACTIVE-TEMPLATE` still wins. `templates/cn/campus/example.tex` is 虚构 and is never a fact source.
+
 Also read the most recent existing CV and cover letter files for concrete structural reference (one of each is enough):
 - Read any existing `cv/main_*<CV_EXT>` file as a structural reference
 - Read any existing `cover_letters/cover_*<COVER_EXT>` or `cover_letters/Cover_*<COVER_EXT>` file as a structural reference
@@ -121,10 +125,10 @@ Also read the most recent existing CV and cover letter files for concrete struct
 
 ### CV (`cv/main_<company>_<role><CV_EXT>`)
 - In the **CV language from the profile** (the `CV language:` line in CLAUDE.md's Identity section). When the profile does not set one, default to **English**. Never switch language per posting - the CV language is a profile-level choice, so all CVs stay consistent and reusable
-- If the Chinese one-page résumé was selected above, copy `templates/cn/resume.tex` to this path, keep the photo line commented out unless a photo was requested, and replace the bracket placeholders from the profile. Section headings stay in Chinese. Otherwise follow the moderncv/banking format from `05-cv-templates.md`
+- If the Chinese one-page résumé was selected above, copy the selected skeleton (`templates/cn/resume.tex` or `templates/cn/campus/resume.tex`) to this path, keep the photo line commented out unless a photo was requested, and replace the bracket placeholders from the profile. Section headings stay in Chinese. Otherwise follow the moderncv/banking format from `05-cv-templates.md`
 - Tailor the profile statement and experience bullets to the specific role
 - Reframe skills and achievements to match job requirements
-- Keep to 2 pages, or exactly 1 page when the Chinese one-page résumé was selected. Do not copy wording from `templates/cn/example.tex`
+- Keep to 2 pages, or exactly 1 page when the Chinese one-page résumé was selected. Do not copy wording from either fictional example (`templates/cn/example.tex` or `templates/cn/campus/example.tex`)
 - **Grounding Audit:** Before writing to disk, audit all tailored bullet points against the union of three sources: `.claude/skills/job-application-assistant/01-candidate-profile.md` + the master CV (`cv/main_example.tex`) + `CLAUDE.md`'s Candidate Profile section to verify that all dates, roles, and metrics match exactly (zero profile drift or fabrication). The 虚构 file `templates/cn/example.tex` is not one of the three sources.
 
 ### Cover Letter (`cover_letters/cover_<company>_<role><COVER_EXT>`)

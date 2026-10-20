@@ -26,6 +26,7 @@ Expected output: `Output written on main_<company>_<role>.pdf (2 pages, ...)`. F
 
 Not the default. `/apply` selects it only when no `ACTIVE-TEMPLATE` block is active and the profile's `CV language` is 中文 (`Chinese` or `zh` also count), or when the user asks for the one-page Chinese résumé in that turn. A registered custom template wins.
 
+- **Campus/intern:** `Career stage: campus / intern` (校招/实习) selects `templates/cn/campus/resume.tex` within this Chinese path; read its README. Education first, optional GPA/ranking, internships/projects/campus/competitions/scholarships, no invented employer. `templates/cn/campus/example.tex` is 虚构, never a fact source. Same xelatex/style/page limit; an active custom template still wins.
 - **Skeleton:** `templates/cn/resume.tex`, copied to `cv/main_<company>_<role>.tex`. Macros live in `templates/cn/cnresume.sty`. Read `templates/cn/README.md` before drafting.
 - **Engine:** **xelatex**. The class is `ctexart` with `fontset=none`, which loads xeCJK. Do not compile it with pdflatex or lualatex, and do not pass `-shell-escape`. `cnresume.sty` embeds Noto CJK when that font is installed, because pypdf can read it. Fandol is the fallback and pypdf garbles its Chinese text layer; install Noto and recompile rather than rewriting bullets to match the garbage.
 - **Page limit:** exactly 1. Content limits are in the folder README. Cut to fit; do not drop below `\zihao{5}` or 12mm margins.

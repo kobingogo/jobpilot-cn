@@ -4,6 +4,8 @@
 
 # AI Job Search
 
+**中文用户：从 [中文快速开始](#中文快速开始) 进入（含校招 / 实习）。English users: [Quick start](#quick-start).**
+
 *The job search that runs on your machine.*
 
 <p align="center">
@@ -66,6 +68,26 @@ The framework encodes career guidance best practices, including structured evalu
 - [Bun](https://bun.sh) (for job search CLI tools)
 - LaTeX distribution with `lualatex` and `xelatex`: [TeX Live](https://tug.org/texlive/), [MacTeX](https://tug.org/mactex/), [TinyTeX](https://yihui.org/tinytex/), or [MiKTeX](https://miktex.org/). The CV compiles with `lualatex` (pdflatex often fails on modern MiKTeX installs with `fontawesome5` font-expansion errors); the cover letter compiles with `xelatex` because `cover.cls` requires `fontspec`. If using a minimal TeX install such as TinyTeX or BasicTeX, install the extra packages listed in [SETUP.md](SETUP.md#minimal-tex-install-tinytexbasictex).
 - Optional: `pip install pypdf` for `/apply`'s ATS parseability check (BSD; no Poppler required). Poppler `pdftotext` remains a fallback (macOS: `brew install poppler`, Debian/Ubuntu: `apt install poppler-utils`, Windows: `choco install poppler`). If both are missing, the check degrades to a visual keyword review.
+
+## 中文快速开始
+
+本地中文路径只接收手工粘贴的 JD，不抓取招聘网站，不自动打招呼或投递。先获取本中文分支：
+
+```bash
+git clone https://github.com/kobingogo/jobpilot-cn.git
+cd jobpilot-cn
+# Debian/Ubuntu；其他系统见 SETUP.md
+sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra fonts-noto-cjk
+claude
+```
+
+在会话里输入 `/setup 中文`，或直接用中文回答。设置会以中文提问，默认 **CV language: 中文**；选择「社招 / 校招 / 实习」，分别使用 `templates/cn/resume.tex` 或 `templates/cn/campus/resume.tex`，已激活自定义模板优先。英文用户仍走 English / moderncv。
+
+准备姓名、城市、教育/经历（项目也算）、目标岗位和可到岗时间；薪资可填区间或暂不确定。校招/实习另确认在读状态、毕业年份、每周可到岗天数和持续月数；GPA/排名、奖项、照片和 LinkedIn 可跳过。`/setup` 会把确认后的筛选设置写入本地 `config/cn_filters.json`，实习日薪使用 `salary.min_daily`（元/天）。
+
+下一步输入 `/apply` 并**手工粘贴完整 JD**，审阅生成的简历与未发送短讯，再自行投递。中文路径无需 Bun 或招聘门户 CLI，丹麦站点演示仅适用于丹麦。面试时用 `/interview <公司>`；参阅 [中文指南](docs/cn/)、[校招/实习模板](templates/cn/campus/README.md)、[校招/实习面试准备](docs/cn/校招实习面试准备.md) 和 [中文安装说明](SETUP.md#中文路径)。
+
+`/setup` 会将个人资料写进受 git 跟踪的档案文件；保留在本地，或使用私有仓库，勿推到公开 fork。远端安排见 [SETUP.md section 8](SETUP.md#8-pulling-upstream-updates-into-your-fork)。不要把密钥填进档案或提交。
 
 ## Quick start
 
@@ -386,7 +408,7 @@ MIT
 
 本分支面向中国招聘平台：Boss直聘、智联、拉勾、猎聘。这里没有爬虫，也不会自动投递。职位描述（JD）由使用者手工粘贴，再进入匹配评估以及简历、求职信的撰写流程。
 
-一页中文简历在 `templates/cn/`（ctex / xeCJK，用 xelatex 编译，照片开关默认关闭）。`example.tex` 标明**虚构**，不是真人，不能当作事实来源。档案里的 CV language 为中文，且没有用 `/add-template` 激活别的模板时，`/apply` 用这份骨架起草，页数是 1 页，而不是 moderncv 的 2 页。模板本身不抓取招聘网站，也不自动打招呼或投递。
+校招/实习完整路径见 [campus 模板](templates/cn/campus/README.md) 与 [面试准备](docs/cn/校招实习面试准备.md)。一页中文简历在 `templates/cn/`（ctex / xeCJK，用 xelatex 编译，照片开关默认关闭）。`example.tex` 标明**虚构**，不是真人，不能当作事实来源。档案里的 CV language 为中文，且没有用 `/add-template` 激活别的模板时，`/apply` 用这份骨架起草，页数是 1 页，而不是 moderncv 的 2 页。模板本身不抓取招聘网站，也不自动打招呼或投递。
 
 `templates/cn/outreach.md` 是两段短讯：Boss直聘打招呼（2 到 3 句）和智联/猎聘申请附言。`/apply` 按档案填好，写到 `documents/applications/<company>_<role>/outreach.md`。使用者自己复制发送，命令不会打开网站，也不会自动打招呼或投递。追踪状态仍是 `drafted`。其中的林示意是**虚构**示例。
 

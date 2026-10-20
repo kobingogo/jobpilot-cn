@@ -2,6 +2,24 @@
 
 Step-by-step instructions for getting the AI Job Search framework running.
 
+## 中文路径
+
+中文用户先按 [README 中文快速开始](README.md#中文快速开始) 克隆 `kobingogo/jobpilot-cn`，保留中文内容；本指南下面的英文/国际流程仍可使用。安装 Claude Code、Python 3.10+，以及 XeLaTeX、ctex、中文字体即可走手贴 JD 路径，不需要安装 Bun 或招聘门户 CLI。
+
+Debian/Ubuntu：
+
+```bash
+sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-latex-recommended fonts-noto-cjk
+```
+
+macOS/Windows 在 TeX Live / MacTeX / MiKTeX 中安装 ctex、xeCJK 和 Noto CJK SC 字体。中文简历使用 **xelatex**，不要照下面英文 moderncv 的 lualatex 命令编译；具体命令见 [templates/cn/README.md](templates/cn/README.md)。求职信仍使用 cover.cls，所需依赖见下文。
+
+启动 `claude` 后输入 `/setup 中文`。中文输入或选择「中文」会设 `CV language: 中文`，英文用户保留 `English`。三条资料导入路径均可用。选择职业阶段后，将 `Career stage: experienced / campus / intern`、在读状态、毕业年份和可到岗时间记录进档案；校招/实习使用 `templates/cn/campus/resume.tex`，社招使用 `templates/cn/resume.tex`，已激活的自定义模板优先。校园项目可作为经历，不要求现职雇主。
+
+筛选阈值只放本地 gitignored 的 `config/cn_filters.json`：实习日薪 `salary.min_daily` 为元/天，`campus.graduation_year` 为毕业年份，`labor.candidate_is_student` 为 true/false/null。示例阈值是虚构数字，须由自己确认后再使用。
+
+然后 `/apply` 后手工粘贴完整 JD，自己审阅并发送；不抓取、不自动打招呼或投递。中文路径跳过下文第 3 节门户安装及第 6 节丹麦 URL 示例。面试参阅 [社招指南](docs/cn/面试准备.md) 或 [校招实习指南](docs/cn/校招实习面试准备.md)。个人档案仍会写入 tracked 文件，勿推送公开仓库，私有远端说明见 section 8。
+
 ## 1. Prerequisites
 
 ### Claude Code
@@ -334,6 +352,12 @@ This is expected if you haven't set up salary benchmarking. The `/apply` workflo
 
 ### Job search CLI tools not working
 Make sure Bun is installed and you ran `bun install` in each CLI directory. The tools require network access to fetch job listings.
+
+### 中文简历故障排除
+
+- **ctexart.cls / xeCJK.sty 找不到**：安装 `texlive-lang-chinese`（或发行版对应的 ctex / xeCJK 包），用 `xelatex` 编译。
+- **找不到 Noto 字体或中文抽取乱码**：安装 `fonts-noto-cjk`，刷新字体缓存后重新编译；Fandol 仅作后备，不要把抽取乱码改写进正文。
+- **cnresume.sty 找不到**：在仓库 `cv/` 中按 `templates/cn/README.md` 设置 `TEXINPUTS=../templates/cn//:`；从校园模板目录测试时使用 `TEXINPUTS=.:..//:`。校招和社招都要求 PDF 恰好一页。
 
 ### LaTeX compilation errors
 - CV: uses `lualatex` (pdflatex often fails on modern MiKTeX with `fontawesome5` font-expansion errors; lualatex handles the same sources cleanly)
