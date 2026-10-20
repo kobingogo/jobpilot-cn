@@ -81,6 +81,8 @@ sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra fonts-no
 claude
 ```
 
+依赖下载、Windows UTF-8、TeX Live 镜像及模型服务网络说明见 [SETUP 中文路径](SETUP.md#中文路径)。没有 `claude` 时可按其中说明做手工演练，斜杠命令不能直接在系统终端运行。
+
 在会话里输入 `/setup 中文`，或直接用中文回答。设置会以中文提问，默认 **CV language: 中文**；选择「社招 / 校招 / 实习」，分别使用 `templates/cn/resume.tex` 或 `templates/cn/campus/resume.tex`，已激活自定义模板优先。英文用户仍走 English / moderncv。
 
 准备姓名、城市、教育/经历（项目也算）、目标岗位和可到岗时间；薪资可填区间或暂不确定。校招/实习另确认在读状态、毕业年份、每周可到岗天数和持续月数；GPA/排名、奖项、照片和 LinkedIn 可跳过。`/setup` 会把确认后的筛选设置写入本地 `config/cn_filters.json`，实习日薪使用 `salary.min_daily`（元/天）。
