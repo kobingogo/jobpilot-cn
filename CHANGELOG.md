@@ -15,6 +15,12 @@ per-file diff commands.
 
 ### Added
 
+- **Chinese JD screen feeds `/rank` and `/apply` scores** (`tools/cn_jd_check.py`, `.claude/agents/posting-scorer.md`, `.claude/commands/rank.md`, `.claude/commands/apply.md`, `tools/rank_state.py`) - scorers run the checker on cleaned posting text. A hard-filter fail or scam flag blocks the fit score; jargon penalties lower it. The script does not fetch, scrape, greet, or apply. Job descriptions stay pasted by hand. No personal data is written into the filter config.
+
+- **One-page Chinese résumé** (`templates/cn/`, `.claude/commands/apply.md`, `05-cv-templates.md`) - a ctex/xeCJK résumé compiled with xelatex, photo off unless `\cnphoto` is set, plus `example.tex` marked 虚构. `/apply` drafts from it when the CV language is Chinese and no custom template is active; the page limit is then 1, not the moderncv 2. Stock moderncv is unchanged otherwise. Job descriptions stay pasted by hand. The template does not scrape or submit.
+
+- **Chinese outreach drafts** (`templates/cn/outreach.md`, `.claude/commands/apply.md`, `.claude/agents/application-reviewer.md`) - a Boss直聘 greeting of 2 or 3 sentences and a short 智联/猎聘 application note. `/apply` fills them from the profile when the Chinese résumé is selected or those boards are named, and writes `documents/applications/<company>_<role>/outreach.md`. The user copies and sends. The command does not open the site, greet, or submit, and the tracker stays `drafted`. Examples are marked 虚构. Job descriptions for those boards stay pasted by hand. No scraper is added.
+
 - **CI runs the Python suite on Windows** (`.github/workflows/ci.yml` `python-tests-windows`) - every
   job ran on Ubuntu, so a Windows-only failure reached master with all checks green: #480's test
   (an atomic rename that Windows file locking refuses) and #486's (a tool printing non-ASCII JSON

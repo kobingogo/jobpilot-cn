@@ -14,6 +14,10 @@ framework_version: 1.1.1
 - **Email:** [YOUR_EMAIL]
 - **LinkedIn:** [YOUR_LINKEDIN_URL]
 - **GitHub:** [YOUR_GITHUB_URL]
+- **Career stage:** [YOUR_CAREER_STAGE] <!-- experienced / campus / intern; 校招 / 实习 aliases accepted -->
+- **Student status:** [YOUR_STUDENT_STATUS] <!-- true / false / unknown; current enrollment, not inferred from stage -->
+- **Graduation year:** [YOUR_GRADUATION_YEAR] <!-- expected or actual four-digit cohort, not birth year -->
+- **Availability:** [YOUR_AVAILABILITY] <!-- start date; internship days/week and duration if relevant -->
 - **Status:** [YOUR_EMPLOYMENT_STATUS]
 - **Constraints:** [YOUR_COMMUTE_OR_LOCATION_CONSTRAINTS]
 

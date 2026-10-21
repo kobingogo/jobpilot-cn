@@ -154,6 +154,8 @@ applications/
 
 **`job_posting.md`** — The full job posting text, written by `/apply`, or paste it here. Used by `/setup` to infer which skills and role types you have targeted, and to calibrate `04-job-evaluation.md`.
 
+**`outreach.md`** — Chinese copy-paste drafts written by `/apply` (a Boss直聘 打招呼 of 2 or 3 sentences, and a 智联/猎聘 申请附言). Not proof that anything was sent. The candidate copies the text into the site. `/setup` does not read this file. A later redraft of an already-submitted application is `outreach_redraft.md`, so the text that may already have been pasted is left in place.
+
 **`cover_letter.tex`** — The cover letter you actually submitted. Used to extract writing style patterns and structure for `06-cover-letter-templates.md`.
 
 **`cv_draft.tex`** — The CV variant you submitted. Used to extract profile statement styles for `05-cv-templates.md`.

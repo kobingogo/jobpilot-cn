@@ -513,6 +513,77 @@ class Apply(RankStateCase):
         )
         self.assertEqual(self.read_state()["a"]["location"], "Athens, Greece")
 
+    def test_cn_jd_penalties_lower_the_score_and_flags_block(self):
+        """hard_fail and scam_fail exclude the job; jargon and scam penalties lower rank_score."""
+        self.write_state({k: entry() for k in "abcd"})
+        scores = {"technical": 80, "experience": 80, "behavioral": 80, "career": 80}
+        out = self.run_tool(
+            "apply",
+            "--results",
+            self.results(
+                [
+                    self._scored(scores=scores, jargon_penalty=10),
+                    self._scored(key="b", scores=scores, hard_fail=True),
+                    self._scored(key="c", scores=scores, scam_fail=True, scam_penalty=30),
+                    self._scored(key="d", scores=scores, jargon_penalty=90, scam_penalty=30),
+                ]
+            ),
+        )
+        # 80 - 10 jargon. Not blocked.
+        self.assertEqual(self.read_state()["a"]["rank_score"], 70)
+        self.assertEqual(self.read_state()["a"]["rank_verdict"], "Good Fit")
+        self.assertEqual(self.read_state()["a"]["jargon_penalty"], 10)
+        self.assertNotIn("hard_fail", self.read_state()["a"])
+        # 80, blocked on the hard filter. Penalty is not invented.
+        self.assertEqual(self.read_state()["b"]["rank_score"], 80)
+        self.assertTrue(self.read_state()["b"]["hard_fail"])
+        # 80 - 30 scam, and blocked.
+        self.assertEqual(self.read_state()["c"]["rank_score"], 50)
+        self.assertTrue(self.read_state()["c"]["scam_fail"])
+        # 80 - 90 - 30 floors at 0. Jargon alone does not veto.
+        self.assertEqual(self.read_state()["d"]["rank_score"], 0)
+        self.assertEqual(self.read_state()["d"]["rank_verdict"], "Poor Fit")
+        self.assertEqual([r["key"] for r in out["ranked"]], ["a", "d"])
+        self.assertEqual(sorted(r["key"] for r in out["vetoed"]), ["b", "c"])
+        blocked = {r["key"]: r for r in out["vetoed"]}
+        self.assertTrue(blocked["b"]["hard_fail"])
+        self.assertEqual(blocked["c"]["scam_penalty"], 30)
+
+    def test_cn_jd_fields_absent_leave_the_score_and_drop_stale_values(self):
+        self.write_state({"a": entry(status="ranked", hard_fail=True, jargon_penalty=40, rank_score=10)})
+        out = self.run_tool(
+            "apply",
+            "--results",
+            self.results([self._scored()]),
+        )
+        stored = self.read_state()["a"]
+        self.assertNotIn("hard_fail", stored)
+        self.assertNotIn("jargon_penalty", stored)
+        self.assertEqual(stored["rank_score"], 80)
+        self.assertFalse(out["ranked"][0]["hard_fail"])
+        self.assertEqual(out["ranked"][0]["jargon_penalty"], 0)
+        self.assertEqual(out["vetoed"], [])
+
+    def test_bad_cn_jd_field_does_not_write(self):
+        original = entry()
+        self.write_state({"a": original, "b": entry()})
+        scores = {"technical": 80, "experience": 80, "behavioral": 80, "career": 80}
+        out = self.run_tool(
+            "apply",
+            "--results",
+            self.results(
+                [
+                    {"key": "a", "status": "scored", "scores": scores, "jargon_penalty": True},
+                    {"key": "b", "status": "scored", "scores": scores, "hard_fail": "yes"},
+                ]
+            ),
+            expect=1,
+        )
+        self.assertEqual(len(out["errors"]), 2)
+        self.assertEqual(self.read_state()["a"], original)
+        self.assertEqual(self.read_state()["b"]["status"], "new")
+        self.assertEqual(out["ranked"], [])
+
     def test_vetoed_rows_are_separated_from_the_ranking(self):
         self.write_state({"a": entry(), "b": entry(), "c": entry()})
         scores = {"technical": 90, "experience": 90, "behavioral": 90, "career": 90}

@@ -1,0 +1,24 @@
+% Shared A4 layout. ctexart letters use the local workflow header/sign-off.
+% Legacy cover.cls letters retain their margins and Latin fonts.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{cncover}[2026/10/21 Chinese cover letter A4 layout]
+\RequirePackage{geometry}
+\geometry{a4paper}
+\makeatletter
+\@ifclassloaded{ctexart}{%
+  \geometry{margin=20mm}%
+  \pagestyle{empty}%
+  \setlength{\parindent}{0pt}%
+  \setlength{\parskip}{0.8\baselineskip}%
+}{}
+\makeatother
+\newcommand{\cnletterhead}[3]{%
+  {\LARGE\bfseries #1\par}%
+  {\small #2\par}%
+  \hfill #3\par
+  \hrule\vspace{0.6\baselineskip}%
+}
+\newcommand{\cnlettersignoff}[1]{%
+  \par 此致\\敬礼！\par
+  \hfill #1\par
+}

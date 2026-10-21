@@ -2,6 +2,63 @@
 
 Step-by-step instructions for getting the AI Job Search framework running.
 
+## 中文路径
+
+核心入口已迁到 [skills/jobpilot-cn/SKILL.md](skills/jobpilot-cn/SKILL.md)，完整操作见
+[安装与使用（各平台）](docs/cn/安装与使用（各平台）.md)。在仓库根目录打开任意本地 Agent，
+告诉它读取该文件即可；不需要 Claude Code、子代理或 `.claude/settings.json`。
+模型由宿主配置，Claude 的 settings.local.json 只是一个可选适配方式。
+新资料用 `python3 tools/jobpilot.py init` 和 `setup-profile write` 写入被忽略的
+`profile/candidate.json`，手贴 JD 用 `check-jd --in jd.txt`。
+下文 `/setup` 等是 Claude 兼容入口，其他宿主直接说「按 Skill 帮我建档/起草/准备面试」。
+
+
+中文用户先按 [README 中文快速开始](README.md#中文快速开始) 克隆 `kobingogo/jobpilot-cn`，保留中文内容；本指南下面的英文/国际流程仍可使用。选择任意支持 shell 与文件读写的本地 Agent，安装 Python 3.10+，以及导出 PDF 所需 XeLaTeX、ctex、中文字体和 Poppler 即可走手贴 JD 路径，不需要安装 Bun 或招聘门户 CLI。
+
+Debian/Ubuntu：
+
+```bash
+sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-latex-recommended fonts-noto-cjk poppler-utils
+```
+
+macOS/Windows 在 TeX Live / MacTeX / MiKTeX 中安装 ctex、xeCJK；优先 Noto CJK SC，亦支持 Windows SimSun / Microsoft YaHei 和 macOS Songti SC / PingFang SC。中文简历使用 **xelatex**，不要照下面英文 moderncv 的 lualatex 命令编译；具体命令见 [templates/cn/README.md](templates/cn/README.md)。求职信仍使用 cover.cls，所需依赖见下文。
+
+启动 `claude` 后输入 `/setup 中文`。中文输入或选择「中文」会设 `CV language: 中文`，英文用户保留 `English`。三条资料导入路径均可用。选择职业阶段后，将 `Career stage: experienced / campus / intern`、在读状态、毕业年份和可到岗时间记录进档案；校招/实习使用 `templates/cn/campus/resume.tex`，社招使用 `templates/cn/resume.tex`，已激活的自定义模板优先。校园项目可作为经历，不要求现职雇主。
+
+筛选阈值只放本地 gitignored 的 `config/cn_filters.json`：实习日薪 `salary.min_daily` 为元/天，`campus.graduation_year` 为毕业年份，`labor.candidate_is_student` 为 true/false/null。示例阈值是虚构数字，须由自己确认后再使用。
+
+然后 `/apply` 后手工粘贴完整 JD，自己审阅并发送；不抓取、不自动打招呼或投递。中文路径跳过下文第 3 节门户安装及第 6 节丹麦 URL 示例。面试参阅 [社招指南](docs/cn/面试准备.md) 或 [校招实习指南](docs/cn/校招实习面试准备.md)。个人档案仍会写入 tracked 文件，勿推送公开仓库，私有远端说明见 section 8。
+
+### 中国大陆安装、网络与编码
+
+Python 工具只处理本地手贴 JD，标准库即可运行检查器。可选的 PDF 抽取和测试依赖若下载缓慢，可临时使用清华 PyPI 镜像（不修改全局源）：
+
+```bash
+python3 -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple pypdf pytest
+```
+
+Windows 将 `python3` 换成 `py` 或 `python`。镜像须使用 HTTPS，`/simple` 不能省略；说明见 [TUNA PyPI 帮助](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/)。
+
+独立安装的 TeX Live / MacTeX 可在安装器选择 [TUNA CTAN 镜像](https://mirrors.tuna.tsinghua.edu.cn/help/CTAN/)，或只为本次装包指定仓库：
+
+```bash
+tlmgr --repository https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet install ctex xecjk fandol
+```
+
+镜像包仓库应与本机 TeX Live 年份匹配；旧发行版不要强行跨年更新。Debian/Ubuntu 用前面的 apt 包安装依赖，不对系统 TeX 运行上面的 tlmgr。MiKTeX 在 Console 选择 CTAN 镜像。
+
+Claude Code 安装、登录和模型服务需要相应网络与账户条件；服务可用地区、供应商条款和组织网络策略以各自官方说明为准。软件包镜像只解决依赖下载，不代表模型服务可访问。可先查看 [Claude Code 安装](https://code.claude.com/docs/en/setup) 与 [网络配置](https://code.claude.com/docs/en/network-config)，再按 [中文模型配置](docs/cn/模型配置.md) 配置支持的 Anthropic 兼容端点；该文档包含主模型与子代理映射、密钥类型及 `/status` 核对方法。模型名、套餐权限和端点可能变化，使用前按供应商官方说明核对；不在本仓库填写或打印真实密钥。
+
+没有 `claude` 也可完整使用通用 Skill：在仓库根目录告诉宿主读取 `skills/jobpilot-cn/SKILL.md`，由普通对话与 Python CLI 完成流程。不要在系统终端执行 `/setup`、`/apply`、`/interview`。宿主自身的模型接入需独立验证。中文流程无需 Bun 或门户安装。
+
+文本、JSON、`.tex` 文件保存为 **UTF-8**；检查器接受带 BOM 的 UTF-8 JSON（包括 Windows PowerShell 5 的 `-Encoding UTF8` 输出）。Windows PowerShell 从文件读取更稳妥：
+
+```powershell
+py tools/cn_jd_check.py --in jd.txt
+```
+
+Python 工具强制 UTF-8 stdout/stderr；终端若仍乱码，先选支持中文的字体，并检查读取端编码。旧 PowerShell 写重定向文件时可用 `py tools/cn_jd_check.py --in jd.txt | Out-File -Encoding utf8 report.json`。XeLaTeX 的 Windows `TEXINPUTS` 使用分号，具体命令见 [中文模板](templates/cn/README.md#输出位置与终端)。编译成功后仍须查 `Missing character`、中文抽取和一页页数。
+
 ## 1. Prerequisites
 
 ### Claude Code
@@ -334,6 +391,12 @@ This is expected if you haven't set up salary benchmarking. The `/apply` workflo
 
 ### Job search CLI tools not working
 Make sure Bun is installed and you ran `bun install` in each CLI directory. The tools require network access to fetch job listings.
+
+### 中文简历故障排除
+
+- **ctexart.cls / xeCJK.sty 找不到**：安装 `texlive-lang-chinese`（或发行版对应的 ctex / xeCJK 包），用 `xelatex` 编译。
+- **找不到 Noto 字体或中文抽取乱码**：安装 `fonts-noto-cjk`，刷新字体缓存后重新编译；Fandol 仅作后备，不要把抽取乱码改写进正文。
+- **cnresume.sty 找不到**：在仓库 `cv/` 中按 `templates/cn/README.md` 设置 `TEXINPUTS=.:../templates/cn//:`；从校园模板目录测试时使用 `TEXINPUTS=.:..//:`。校招和社招都要求 PDF 恰好一页。
 
 ### LaTeX compilation errors
 - CV: uses `lualatex` (pdflatex often fails on modern MiKTeX with `fontawesome5` font-expansion errors; lualatex handles the same sources cleanly)

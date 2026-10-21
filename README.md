@@ -4,6 +4,8 @@
 
 # AI Job Search
 
+**中文用户：从 [中文快速开始](#中文快速开始) 进入（含校招 / 实习）。English users: [Quick start](#quick-start).**
+
 *The job search that runs on your machine.*
 
 <p align="center">
@@ -12,7 +14,7 @@
 
 [![CI](https://github.com/MadsLorentzen/ai-job-search/actions/workflows/ci.yml/badge.svg)](https://github.com/MadsLorentzen/ai-job-search/actions/workflows/ci.yml)
 
-An AI-powered job application framework built on [Claude Code](https://claude.com/claude-code). Fork it, fill in your profile, and let Claude evaluate job postings, tailor your CV, write cover letters, and prepare you for interviews.
+jobpilot-cn provides a [platform-agnostic local Skill](skills/jobpilot-cn/SKILL.md) for Chinese job applications. Use any agent with shell and file access to evaluate pasted JDs, draft documents and prepare for interviews. The original international Claude Code workflow is retained below.
 
 > Note: This is an independent open-source project and is not affiliated with, endorsed by, sponsored by, or maintained by Anthropic. Anthropic and Claude Code are referenced only to describe the toolchain this workflow uses.
 >
@@ -61,11 +63,61 @@ The framework encodes career guidance best practices, including structured evalu
 
 ## Prerequisites
 
+中文 Skill：Python 3.10+ 与任意本地 Agent 即可；PDF 另需 XeLaTeX/Poppler。以下为历史国际流程依赖，中文用户直接看下一节。
+
 - [Claude Code](https://claude.com/claude-code) (CLI). Claude Code has no free tier: you need a Claude Pro/Max/Team subscription or Anthropic API credits (pay-per-token, usually cheaper for occasional use). Using a different agent tool (Codex, Antigravity, Gemini CLI)? Start at [`AGENTS.md`](AGENTS.md) - the portal search skills work there out of the box, and [community forks](https://github.com/MadsLorentzen/ai-job-search/discussions/78) adapt the full workflow.
 - Python 3.10+
 - [Bun](https://bun.sh) (for job search CLI tools)
 - LaTeX distribution with `lualatex` and `xelatex`: [TeX Live](https://tug.org/texlive/), [MacTeX](https://tug.org/mactex/), [TinyTeX](https://yihui.org/tinytex/), or [MiKTeX](https://miktex.org/). The CV compiles with `lualatex` (pdflatex often fails on modern MiKTeX installs with `fontawesome5` font-expansion errors); the cover letter compiles with `xelatex` because `cover.cls` requires `fontspec`. If using a minimal TeX install such as TinyTeX or BasicTeX, install the extra packages listed in [SETUP.md](SETUP.md#minimal-tex-install-tinytexbasictex).
 - Optional: `pip install pypdf` for `/apply`'s ATS parseability check (BSD; no Poppler required). Poppler `pdftotext` remains a fallback (macOS: `brew install poppler`, Debian/Ubuntu: `apt install poppler-utils`, Windows: `choco install poppler`). If both are missing, the check degrades to a visual keyword review.
+
+## 中文快速开始
+
+现在以 **[jobpilot-cn 通用 Skill](skills/jobpilot-cn/SKILL.md)** 为核心，支持有 shell 和文件读写能力的
+Codex CLI、Cursor、Trae、Grok Build、Gemini CLI/agy、Claude Code 等本地 Agent。
+Skill 使用宿主自己的模型；国产模型在宿主配置，无需 Claude 账户或 `.claude/settings`。
+[安装与使用（各平台）](docs/cn/安装与使用（各平台）.md) 给出入口、中文提示及未核实路径的兜底办法。
+
+只接收手工粘贴的 JD，不抓取招聘网站，不自动打招呼或投递。先获取本中文分支：
+
+```bash
+git clone https://github.com/kobingogo/jobpilot-cn.git
+cd jobpilot-cn
+python3 tools/jobpilot.py init
+# 需要导出 PDF 时安装；Windows/macOS 见 SETUP.md
+sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra fonts-noto-cjk poppler-utils
+```
+
+Windows 将 `python3` 换成 `py`。在任意 Agent 中打开仓库根目录，说：
+
+> 读 skills/jobpilot-cn/SKILL.md，按 setup 步骤用中文帮我建档；未知信息先问我。
+
+> 这份 JD 已由我保存为 documents/postings/jd.txt。按 jobpilot-cn 检查并起草申请，审阅后编译一页中文 PDF；我自己投递。
+
+准备姓名、城市、教育/经历（项目也算）、目标岗位和可到岗时间；选择社招 / 校招 / 实习。
+默认 **CV language: 中文**，社招选 `templates/cn/resume.tex`，校招/实习选
+`templates/cn/campus/resume.tex`，已有激活自定义模板优先。英文档案仍可保留 English。
+在读状态单独确认，不从毕业年份推断；GPA、照片、LinkedIn 和薪资均可暂缺。
+确认后的档案写入本地 `profile/candidate.json`，筛选设置在 `config/cn_filters.json`，均被 git 忽略。
+
+CLI 不连接模型，负责本地确定性步骤：
+
+```bash
+python3 tools/jobpilot.py check-jd --in documents/postings/jd.txt
+python3 tools/jobpilot.py scaffold-application --in documents/postings/jd.txt --company 虚构公司 --role 虚构岗位
+python3 tools/jobpilot.py compile documents/applications/虚构公司_虚构岗位/cv_draft.tex --contains 虚构
+python3 tools/jobpilot.py interview-prep --application documents/applications/虚构公司_虚构岗位 --stage 一面
+```
+
+上面的公司和岗位是**虚构**；骨架仍需宿主 Agent 按步骤完成撰写、审阅。
+使用真实资料前先建档；没有确认档案时 scaffold 会提示先建档。
+有面试后说「按 jobpilot-cn 帮我准备这份申请的技术面」。多份本地 JD 可走 rank 步骤。
+依赖下载、Windows UTF-8 与 TeX 镜像见 [SETUP 中文路径](SETUP.md#中文路径)。
+
+Claude Code 用户仍可用 `/setup 中文`、`/apply` 后手贴 JD、`/interview` 和 `/rank`，
+中文路径转到同一 Skill；国际路径保留原有 URL 获取、门户 CLI 升级链、子代理和公司研究。[中文模型配置](docs/cn/模型配置.md) 仅为 Claude Code 的可选接入说明。
+中文路径无需 Bun 或门户 CLI。生成文件未发送，审阅后自己投递。
+已有 `CLAUDE.md` 等历史档案受 git 跟踪，勿把个人资料推到公开 fork；不填写或提交密钥。
 
 ## Quick start
 
@@ -193,8 +245,9 @@ ai-job-search/
 │   ├── cover.cls                      # Custom cover letter LaTeX class
 │   ├── cover_example.tex              # Example cover letter (structural reference + CI smoke test)
 │   └── OpenFonts/                     # Lato + Raleway fonts
-├── templates/                         # Custom templates registered via /add-template
-│   └── README.md                      # Folder layout instructions
+├── templates/                         # /add-template registrations, plus templates/cn/
+│   ├── README.md                      # Folder layout instructions
+│   └── cn/                            # One-page Chinese résumé (ctex/xeCJK; example is 虚构)
 ├── documents/                         # Career source materials for /setup Path A and /expand
 │   ├── README.md                      # Folder layout instructions
 │   ├── cv/                            # Master CV (PDF or .tex)
@@ -378,3 +431,15 @@ Thinking about a PR? Read [CONTRIBUTING.md](CONTRIBUTING.md) first - it explains
 ## License
 
 MIT
+
+## 中文本地化（jobpilot-cn）
+
+本仓库（jobpilot-cn）是上游项目 [ai-job-search](https://github.com/MadsLorentzen/ai-job-search) 的中文本地化分支。上游作者为 [Mads Lorentzen](https://github.com/MadsLorentzen)，许可证为 MIT。本仓库保留上游 `LICENSE` 原文，不另行替换或删改。
+
+本分支面向中国招聘平台：Boss直聘、智联、拉勾、猎聘。这里没有爬虫，也不会自动投递。职位描述（JD）由使用者手工粘贴，再进入匹配评估以及简历、求职信的撰写流程。
+
+校招/实习完整路径见 [campus 模板](templates/cn/campus/README.md) 与 [面试准备](docs/cn/校招实习面试准备.md)。一页中文简历在 `templates/cn/`（ctex / xeCJK，用 xelatex 编译，照片开关默认关闭）。`example.tex` 标明**虚构**，不是真人，不能当作事实来源。档案里的 CV language 为中文，且没有用 `/add-template` 激活别的模板时，`/apply` 用这份骨架起草，页数是 1 页，而不是 moderncv 的 2 页。模板本身不抓取招聘网站，也不自动打招呼或投递。
+
+`templates/cn/outreach.md` 是两段短讯：Boss直聘打招呼（2 到 3 句）和智联/猎聘申请附言。`/apply` 按档案填好，写到 `documents/applications/<company>_<role>/outreach.md`。使用者自己复制发送，命令不会打开网站，也不会自动打招呼或投递。追踪状态仍是 `drafted`。其中的林示意是**虚构**示例。
+
+可选模型是 DeepSeek、Kimi（Moonshot）、GLM（智谱）。Claude Code 读项目里的 `.claude/settings.local.json`（`env` 中的 `ANTHROPIC_BASE_URL` 等），不读 `.env`。配置与隐私说明见 [docs/cn/模型配置.md](docs/cn/模型配置.md)：简历正文会发到对应服务商，不是留在本机。仓库只提交示例 `.claude/settings.local.example.json`（默认 DeepSeek，token 是占位符 `YOUR_DEEPSEEK_API_KEY`）。复制成 `settings.local.json` 后自己填写；该文件已被 `.gitignore` 忽略，含明文密钥，不要提交，也不要贴进聊天。不要同时设置 `ANTHROPIC_API_KEY`。职位描述仍由人粘贴，不因此增加爬虫、自动打招呼或自动投递。

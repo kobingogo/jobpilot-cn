@@ -4,12 +4,17 @@
 <!-- After running /setup, all [PLACEHOLDER] tokens will be replaced with your actual information -->
 
 ## Role
-This repo is a job application workspace. Claude acts as a career advisor and application assistant for [YOUR_NAME], helping with:
+This repo is a job application workspace. The host agent acts as a career advisor and application assistant for [YOUR_NAME], helping with:
 1. **Job fit evaluation** - Assess job postings against your profile (skills, experience, behavioral traits)
 2. **CV tailoring** - Adapt existing CV templates (LaTeX/moderncv) to target specific roles
 3. **Cover letter writing** - Draft targeted cover letters using existing templates (LaTeX)
 4. **Interview preparation** - Prepare answers, questions, and talking points for interviews
 5. **Career strategy** - Advise on positioning and personal branding
+
+中文工作流入口是 [skills/jobpilot-cn/SKILL.md](skills/jobpilot-cn/SKILL.md)。先读对应步骤；
+Claude Code 命令为中文路径引用 Skill，同时保留原有国际流程（URL 获取、门户 CLI、子代理及公司研究）。新用户档案存 `profile/candidate.json`，已有本文件与
+`01-candidate-profile.md` 的事实需先确认再合并。中文路径以 Skill 为准，不启用历史联网流程。
+模型由宿主配置，`.claude/settings.local.json` 仅为 Claude Code 的可选配置。
 
 ## Candidate Profile
 
@@ -27,8 +32,12 @@ This repo is a job application workspace. Claude acts as a career advisor and ap
   undeclared language is a hard deal-breaker if a posting requires it; a declared language at a
   lower level than a posting wants is flagged for your own judgment, not auto-rejected. See
   04-job-evaluation.md's Language Gate. -->
-- **CV language:** [YOUR_CV_LANGUAGE] <!-- English unless your market expects otherwise; /setup asks -->
+- **CV language:** [YOUR_CV_LANGUAGE] <!-- /setup: 中文 for Chinese users; English for English users, unless explicitly chosen otherwise -->
 
+- **Career stage:** [YOUR_CAREER_STAGE] <!-- experienced / campus / intern; 校招 / 实习 aliases accepted -->
+- **Student status:** [YOUR_STUDENT_STATUS] <!-- true / false / unknown; current enrollment, not inferred from stage -->
+- **Graduation year:** [YOUR_GRADUATION_YEAR] <!-- expected or actual four-digit cohort, not birth year -->
+- **Availability:** [YOUR_AVAILABILITY] <!-- start date; internship days/week and duration if relevant -->
 - **Status:** [YOUR_EMPLOYMENT_STATUS]
 - **LinkedIn headline:** "[YOUR_LINKEDIN_HEADLINE]"
 
@@ -96,11 +105,11 @@ automatically from your Languages table above - don't duplicate them here. -->
 ## Workflow for New Job Applications
 1. User provides a job posting (URL or text)
 2. **Always evaluate fit first**: skills match, experience match, behavioral/culture match. Present this assessment to the user before proceeding.
-3. If good fit: create targeted CV (`cv/main_<company>_<role>.tex`) and cover letter (`cover_letters/cover_<company>_<role>.tex`)
+3. If good fit: create targeted CV (`cv/main_<company>_<role>.tex`) and cover letter (`cover_letters/cover_<company>_<role>.tex`). When `/apply` Step 2 says so, also write the unsent Chinese outreach draft the user copies and sends manually
 4. **Verify both documents** (see Verification Checklist below)
 5. Prepare interview talking points based on the role requirements and your strengths
 
-**Important:** When mentioning agentic coding or AI tooling in CVs/cover letters, explicitly reference **Claude Code** by name.
+When mentioning agentic coding or AI tooling, use only tools the candidate actually used and confirmed.
 
 ## Verification Checklist
 After creating or updating a CV or cover letter, re-read the generated file and verify **all** of the following before presenting to the user. Report the results as a pass/fail checklist.
@@ -118,7 +127,7 @@ After creating or updating a CV or cover letter, re-read the generated file and 
 - [ ] Nice-to-have requirements are highlighted where there is a match
 
 ### Consistency
-- [ ] CV follows the standard 2-page moderncv/banking format
+- [ ] CV follows the standard 2-page moderncv/banking format, unless `/apply` selected the one-page Chinese résumé in `templates/cn/` (ctex/xeCJK, xelatex, photo off unless asked)
 - [ ] Cover letter uses cover.cls template and established structure
 - [ ] Tone is consistent across CV and cover letter
 - [ ] No contradictions between CV and cover letter content
@@ -126,15 +135,16 @@ After creating or updating a CV or cover letter, re-read the generated file and 
 ### Quality
 - [ ] No LaTeX syntax errors (balanced braces, correct commands)
 - [ ] No spelling or grammar errors
-- [ ] Agentic coding / AI tooling references mention **Claude Code** by name
+- [ ] Agentic coding / AI tooling references match the candidate’s confirmed tool use
 - [ ] Cover letter is addressed to the correct person (or "Dear Hiring Manager" if unknown)
 - [ ] Cover letter fits approximately one page
+- [ ] When `documents/applications/<company>_<role>/outreach.md` was written, the Boss直聘 打招呼 is 2 or 3 sentences, the 智联/猎聘 申请附言 is one paragraph of at most 4 sentences, every claim is already in the profile, the 虚构 example was not copied, and neither text was sent
 - [ ] CV section headings (`\section{...}`) and the References boilerplate line match the CV's language, not left as the English template defaults (see `05-cv-templates.md`)
 
 ### Compiled PDF verification (MANDATORY - never skip)
-Both documents MUST be compiled and visually inspected via the Read tool on the PDF output. "Looks fine in the .tex" is not acceptable - LaTeX page-break decisions are unpredictable. Iterate until these all pass:
-- [ ] CV compiled with **lualatex** (pdflatex often fails on modern MiKTeX with fontawesome5 font-expansion errors). Cover letter compiled with **xelatex** (cover.cls requires fontspec). If a custom template is active (registered via `/add-template`), compile with its declared command instead — see the `ACTIVE-TEMPLATE` block in `05-cv-templates.md`/`06-cover-letter-templates.md`.
-- [ ] **CV is exactly 2 pages** - not 1, not 3
+Both documents MUST be compiled and visually inspected with an available PDF viewer on the PDF output. "Looks fine in the .tex" is not acceptable - LaTeX page-break decisions are unpredictable. Iterate until these all pass:
+- [ ] CV compiled with **lualatex** (pdflatex often fails on modern MiKTeX with fontawesome5 font-expansion errors). Cover letter compiled with **xelatex** (cover.cls requires fontspec). If a custom template is active (registered via `/add-template`), compile with its declared command instead — see the `ACTIVE-TEMPLATE` block in `05-cv-templates.md`/`06-cover-letter-templates.md`. The one-page Chinese résumé (`templates/cn/`) compiles with **xelatex** (ctex/xeCJK), not lualatex.
+- [ ] **CV is exactly 2 pages** - not 1, not 3. Exception: the Chinese résumé in `templates/cn/` is exactly 1 page
 - [ ] **No orphaned `\cventry` titles** - a job/education title must never sit at the bottom of a page with its bullets spilling to the next page. Use `\needspace{5\baselineskip}` before each `\cventry` to prevent this, and `\enlargethispage{2-3\baselineskip}` to rescue a trailing section that just barely spills
 - [ ] **Cover letter is exactly 1 page** - signature block must fit with the body, never overflow
 - [ ] **Cover letter bullet font matches body font** - `\lettercontent{}` must not wrap `\begin{itemize}...\end{itemize}` (the command's trailing `\\` errors on `\end{itemize}`, and moving itemize outside loses the Raleway font). Standard pattern: close `\lettercontent{}`, then wrap the list in `{\raggedright\fontspec[Path = OpenFonts/fonts/raleway/]{Raleway-Medium}\fontsize{11pt}{13pt}\selectfont \begin{itemize}...\end{itemize}\par}`

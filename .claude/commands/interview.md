@@ -1,8 +1,18 @@
 # /interview - Prepare for an Interview on a Tracked Application
 
+**Workflow routing:** For the Chinese/local `jobpilot-cn` path (explicitly requested,
+or a Chinese-market application), read `skills/jobpilot-cn/SKILL.md` and follow
+[the portable interview step](../../skills/jobpilot-cn/steps/interview.md) instead of the
+Claude Code workflow below. That path accepts hand-pasted/local JDs only: no fetching,
+portal CLIs, automatic greetings or submissions. Conversation language alone does not
+switch an international application to the Chinese-market path. Otherwise follow the
+full Claude Code workflow below, including its upstream fetching and subagent flows.
+
 You are preparing the user for a real, scheduled interview on one of their applications. The frameworks for this already exist - `07-interview-prep.md` (STAR examples, tough questions, questions to ask, roleplay protocol) and the Company Research Checklist in `04-job-evaluation.md` - and the `/outcome` archive records which stage the user is at and what earlier stages surfaced. This command wires them together into a stage-specific prep pack and an optional mock interview.
 
 `/apply` optimizes what the company reads; `/interview` optimizes what the company hears. The bridge between them is consistency: the interviewer has read the submitted CV and cover letter, so everything prepared here must match what those documents claim.
+
+**Language:** use the user's conversation language for questions, prep packs, mock-interview feedback and closing messages. For Chinese users, translate the fixed English prompts below and use Chinese headings; preserve file paths and technical keywords. Unknown facts remain「待确认」.
 
 Follow these steps **in order**.
 
@@ -26,12 +36,14 @@ v1 preps for a **specific application**. Generic no-target practice is out of sc
    - `cv_draft.tex` and `cover_letter.tex` - what was actually submitted. **These are what the interviewer read**; every talking point must be consistent with their claims.
    - `outcome.md` - the stage reached so far and any recorded feedback from earlier stages. Feedback from stage N is the highest-value input for stage N+1 prep.
 2. **Fallbacks** (the application may predate `/outcome`): posting via WebFetch on the tracker row's `source` URL, or ask the user to paste it - either way run it through `python3 tools/posting_guard.py --text` before reading it as content, as for the archived copy above; CV via `cv/main_<company>_<role>.*` and cover letter via `cover_letters/cover_<company>_<role>.*`, deriving `<company>_<role>` by the **Subfolder naming** rule in `documents/README.md`. **Never widen those globs to the company alone**: with two roles at one company it would prep you from the sibling role's documents. State plainly which context is missing rather than guessing - and suggest `/outcome <company>` to build the archive for next time.
-3. **Ask the user what this interview is** (skip anything `outcome.md` already records): stage (phone screen / technical / case / final round), date, format (phone, video, onsite), and who is interviewing (names and titles, if known).
+3. **Ask the user what this interview is** (skip anything `outcome.md` already records): stage (phone screen / technical / case / final round), date, format (phone, video, onsite, or 群面 / 无领导小组讨论), and who is interviewing (names and titles, if known).
 4. **Read the frameworks once** - do not re-read them in later steps:
    - `.claude/skills/job-application-assistant/07-interview-prep.md`
    - `.claude/skills/job-application-assistant/01-candidate-profile.md`
    - `.claude/skills/job-application-assistant/02-behavioral-profile.md`
    - `.claude/skills/job-application-assistant/04-job-evaluation.md`
+   - For a Chinese campus/intern profile (`Career stage: campus / intern`, 校招/实习; or confirmed 在读/应届 when stage is missing), read `docs/cn/校招实习面试准备.md` as the student branch. Use projects/internships/campus evidence, not assumed current employment or salary. Confirm missing stage/status rather than inferring enrollment from a JD. Active CV templates do not override this interview routing.
+   - `docs/cn/面试准备.md` for other Chinese profiles when this is a Chinese role: the posting language is Chinese, the profile `CV language` is 中文 (`Chinese` or `zh` also count), the user asked for a 中文面试, or this application used `templates/cn/`. It adds 自我介绍, 离职原因, 薪资谈判, and 群面/无领导小组讨论. Its 虚构 examples are not facts. Do not scrape, greet, or apply. The posting stays pasted by hand.
 
 ---
 
@@ -52,7 +64,7 @@ Additions for interview purposes:
 
 ## Step 3: Build the Prep Pack
 
-Assemble a stage-appropriate prep document with these sections:
+Assemble a stage-appropriate prep document with these sections. For a Chinese role (the same test as Step 1), use the guide selected in Step 1. For campus/intern profiles, add 自我介绍与申请动机、群面/无领导小组、技术面、HR面、笔试/测评、三方协议/offer 比较 and 实习转正 from `docs/cn/校招实习面试准备.md`, tailored to the stage; do not add assumed current-employer, leaving-job or current-salary answers. For other Chinese profiles, add the four blocks from `docs/cn/面试准备.md`. Fill only from the profile and submitted documents. Both guides' placeholders are preparation fields, not scripts; leave unknown facts as questions and omit unsupported spoken claims. Do not copy 虚构 examples. Skip these blocks for non-Chinese roles.
 
 ### 1. Likely questions
 Derive from four sources, in priority order:
@@ -84,7 +96,7 @@ Save the pack in the archive folder derived in Step 1 as `interview_prep_<stage>
 
 ## Step 4: Offer a Mock Interview
 
-Ask if the user wants to practice. If yes, run the roleplay **in this conversation** following the Roleplay Guidelines in `07-interview-prep.md` exactly: warm-up first, then role-specific technical questions, 1-2 behavioral questions tied to the posting's competencies, and one tough question or curveball. After each answer, give brief feedback - what worked, what to sharpen, and which STAR example from the pack would have served better.
+Ask if the user wants to practice. If the format is 群面 or 无领导小组讨论, practice that format from the guide selected in Step 1 (`docs/cn/校招实习面试准备.md` for campus/intern, otherwise `docs/cn/面试准备.md`) instead of the one-on-one roleplay, and still give feedback after each turn. Otherwise run the roleplay **in this conversation** following the Roleplay Guidelines in `07-interview-prep.md` exactly: warm-up first, then role-specific technical questions, 1-2 behavioral questions tied to the posting's competencies, and one tough question or curveball. After each answer, give brief feedback - what worked, what to sharpen, and which STAR example from the pack would have served better.
 
 Calibrate feedback against `02-behavioral-profile.md`: coach toward the user's natural register, not a generic ideal - the same voice-consistency rule the `/apply` reviewer applies to cover letters.
 

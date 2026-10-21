@@ -211,6 +211,8 @@ class AskDenyRuleTests(GuardRepoFixture):
         # The posting integrity gate runs inside fetch agents with no prompt.
         self.assertIn("Bash(python tools/posting_guard.py:*)", security_guards.ALLOWED_PERMISSIONS)
         self.assertIn("Bash(python3 tools/posting_guard.py:*)", security_guards.ALLOWED_PERMISSIONS)
+        self.assertIn("Bash(python tools/cn_jd_check.py:*)", security_guards.ALLOWED_PERMISSIONS)
+        self.assertIn("Bash(python3 tools/cn_jd_check.py:*)", security_guards.ALLOWED_PERMISSIONS)
 
     def test_malformed_ask_or_deny_shape_fails_cleanly(self):
         for permissions, message in [

@@ -1,5 +1,13 @@
 # /setup - Profile Onboarding
 
+**Workflow routing:** For the Chinese/local `jobpilot-cn` path (explicitly requested,
+or a Chinese-market application), read `skills/jobpilot-cn/SKILL.md` and follow
+[the portable setup step](../../skills/jobpilot-cn/steps/setup.md) instead of the
+Claude Code workflow below. That path accepts hand-pasted/local JDs only: no fetching,
+portal CLIs, automatic greetings or submissions. Conversation language alone does not
+switch an international application to the Chinese-market path. Otherwise follow the
+full Claude Code workflow below, including its upstream fetching and subagent flows.
+
 You are running the onboarding setup for the AI Job Search framework. Your goal is to collect the user's professional information and populate all profile files so the `/apply` workflow works out of the box.
 
 There are three paths into setup. Step 0 picks the right one; all three converge on Step 3 (file generation) and Step 4 (confirmation).
@@ -7,6 +15,18 @@ There are three paths into setup. Step 0 picks the right one; all three converge
 ---
 
 ## Step 0: Welcome & Choose Path
+
+### Language and career-stage routing (all paths, including --section updates)
+
+Before the welcome, use the user's conversation language or explicit language choice. If the user writes Chinese or chooses **中文**, conduct onboarding in Chinese and set **CV language: 中文** by default. If they write English, keep the English interview and **CV language: English** default. An explicit CV-language choice or an existing populated CV-language field wins; an update-only run must not silently reset it. If there is no language signal, offer **中文 / English** before the path choice. Translate every prompt and summary below, including the privacy preflight, into the selected conversation language.
+
+For Chinese users, present these three choices in Chinese: **A 读取 documents/ 资料 / B 导入一份简历 / C 从零访谈**. Explain the minimum needed: 姓名、城市、教育/经历（在校项目也算）、目标岗位、职业阶段、可到岗时间。期望薪资可填写区间或标「暂不确定」；电话/邮箱可暂留占位符，正式导出前再确认。LinkedIn/GitHub、GPA/排名、照片、奖项、推荐人、行为测评和家庭情况均可跳过。不要追问身份证、密钥或无关隐私。
+
+Ask **职业阶段：社招 / 校招（应届）/ 实习**. Record the normalized **Career stage: experienced / campus / intern** in both `CLAUDE.md` and `01-candidate-profile.md`. Separately confirm **Student status: true / false / unknown**, **Graduation year** (expected or actual four-digit year), and **Availability** (date; internship days/week and months). Do not infer current enrollment from a campus application or a graduation year. If importing documents in Path A/B, extract supported facts and ask only for missing or conflicting values; do not invent a current employer for a student. Apply this routing before any Path A skip or --section shortcut.
+
+For CV language 中文 (`Chinese` / `zh` also count), choose `templates/cn/resume.tex`; for **Career stage: campus / intern** (校招/实习), choose `templates/cn/campus/resume.tex` instead. Read `templates/cn/README.md` and the campus README when applicable. An existing `ACTIVE-TEMPLATE` registration still wins. Point to `docs/cn/` and to `docs/cn/校招实习面试准备.md` for campus/intern profiles. English users keep the stock moderncv path unless they explicitly choose another language/template.
+
+Chinese-market onboarding uses **manually pasted JDs**: no scraper, portal CLI setup, automatic greeting or applying. Skip Path C Section 9's portal enablement and search-query suggestions for this path; collect target roles/cities and CV language only. The Danish portals are Denmark-only, optional for the English/international path, and remain disabled unless requested. Do not recommend /add-portal for Chinese boards.
 
 If `$ARGUMENTS` contains `--section <name>`, skip directly to that section in Path C for an update-only flow. Do not run the path-selection prompt below.
 
@@ -273,7 +293,8 @@ Ask about:
 - Location (city, country)
 - Phone, email, LinkedIn, GitHub
 - What languages they work in professionally, and roughly what level in each (native, fluent, conversational, a CEFR letter like B2 - whatever's natural for them to describe, doesn't need to be precise). Worth explaining why: a posting requiring a language they don't list at all gets auto-excluded later by the Language Gate, while one asking for a higher level in a language they do list gets flagged for their own judgment instead of silently passed or rejected - so it's worth being honest here rather than optimistic.
-- Current employment status
+- Career stage, student status, graduation year and availability per Step 0 (all paths)
+- Current employment status (students may have no employer)
 - Family/commute constraints (if any)
 
 ### Section 2: Education
@@ -291,7 +312,7 @@ For each role (most recent first):
 - Key achievements or projects
 - Technologies/tools used
 
-Also ask about independent projects, freelance work, or side projects.
+For campus/intern profiles, ask about internships, coursework/projects, campus activities, competitions and scholarships instead of requiring full-time employment. GPA/ranking are optional; omit unsupported fields. Also ask about independent projects, freelance work, or side projects.
 
 ### Section 4: Technical Skills
 - Programming languages + proficiency level
@@ -339,7 +360,7 @@ Ask about:
 - **Target companies (optional):** "Are there specific companies you'd like to monitor for openings?"
 - **Geographic scope:** "Which cities or regions should I search in? How far are you willing to commute?" Use this to define the location filter tiers (ideal, acceptable, borderline, too far).
 - **Job portals:** "The framework ships country-agnostic search CLIs (`linkedin-search`, `freehire-search`, enabled by default) plus Danish portal demos (Jobindex, Jobbank, Jobdanmark, Jobnet) that ship **disabled**. `/scrape` auto-discovers whatever portal skills are installed under `.agents/skills/` and skips any with `enabled: false`. Which portals fit your market?" **Then act on the answer:** if the user's market is Denmark (or they ask for the Danish boards), edit each of the four Danish `SKILL.md` files and set `enabled: true` in the frontmatter; otherwise leave them disabled and say so - they cost nothing while disabled and can be enabled later by flipping the flag. If the user needs a local board that is not shipped, guide them to `/add-portal` (market-specific skills live in their fork). WebSearch/`site:` queries remain the fallback for portals without a CLI skill.
-- **CV language:** "Should your CVs be written in English (the default, accepted in most markets), or in your market's language?" Record the answer as a `CV language: <language>` line in CLAUDE.md's Identity section. Cover letters always match each posting's language automatically; this setting governs the CV only. If the user is unsure, keep English and note they can re-run `/setup --section search` to change it.
+- **CV language:** Confirm the Step 0 language choice: 中文 for Chinese users, English for English users unless explicitly changed. "简历用中文还是 English？ / Which CV language do you prefer?" Record the answer as a `CV language: <language>` line in CLAUDE.md's Identity section. Cover letters always match each posting's language automatically; this setting governs the CV only. If the user is unsure, keep the language selected in Step 0 and note they can re-run `/setup --section search` to change it.
 
 **Important:** Also suggest role types the user may not have considered, based on their skill profile. For example:
 - If they have strong Python + domain expertise: "Have you considered roles like 'Technical Consultant' or 'Solutions Engineer' in your domain?"
@@ -358,7 +379,7 @@ Once data collection is complete, generate or finish populating the following fi
 Replace all `[PLACEHOLDER]` tokens with the user's actual information. Keep the structure, workflow, and verification checklist intact.
 
 ### 2. Populate `01-candidate-profile.md` *(Path B and C; skip if Path A populated it)*
-Write the full candidate profile with structured sections: Identity (including Languages, with levels), Education, Professional Experience, Independent Projects, Technical Skills, Publications, Awards, References.
+Write the full candidate profile with structured sections: Identity (including Languages, with levels, Career stage, Student status, Graduation year, Availability), Education, Professional Experience, Independent Projects, Technical Skills, Publications, Awards, References.
 
 ### 3. Populate `02-behavioral-profile.md` *(Path B and C; skip if Path A populated it)*
 Write the behavioral profile based on assessment results or synthesized answers.
@@ -378,13 +399,20 @@ Add role-specific profile statement templates based on their background, and per
 Personalise the contact line and the signature inside the file's LaTeX template: replace `[YOUR_NAME]`, `[YOUR_EMAIL]`, `[YOUR_PHONE]` and `[YOUR_LINKEDIN_URL]` in the `\namesection{}` line, and `[YOUR_NAME]` in `\signature{}`. Path A merges only structural patterns (openings, bullets, closings) into this file, never the contact block. `/apply` compiles every cover letter from this template.
 
 ### 7. Update `07-interview-prep.md` *(Path B and C; skip if Path A populated it)*
-Create STAR examples from their actual experience (at least 3-4 examples). Path A leaves STAR stubs under "## STAR Candidates (Complete Manually)" rather than full examples; if any stubs are present, mention them in Step 4 so the user knows to flesh them out.
+Create STAR examples from their actual experience (aim for 3-4 where supported). For campus/intern profiles, use real coursework, projects, internships and campus contributions; if evidence is incomplete or fewer examples exist, leave questions/stubs rather than inventing employment or results. Path A leaves STAR stubs under "## STAR Candidates (Complete Manually)" rather than full examples; if any stubs are present, mention them in Step 4 so the user knows to flesh them out.
 
 ### 8. Update `cv/main_example.tex`
-Replace placeholder personal data with their actual name, contact info, and add their education and most recent experience entries.
+Use the template selected in Step 0 to populate `cv/main_example.tex`: CV language 中文 uses `templates/cn/resume.tex`, or `templates/cn/campus/resume.tex` for campus/intern; CV language English keeps moderncv. Respect any explicit language choice even when conversation language differs. An active custom template wins. Replace placeholder personal data with their actual name, contact info, and add their education and most recent experience entries. Do not personalize the shipped templates or fictional examples in `templates/cn/`. Students without employment use projects/campus evidence, not invented employers. Chinese compile command and exactly-one-page requirement are in `templates/cn/README.md`; reuse its shared style path.
+
+### 8a. Chinese scoring settings (all Chinese paths)
+Create or update gitignored `config/cn_filters.json` from the user's **confirmed thresholds only**, never from the fictional example numbers. Leave unknown values null or sections empty. Preserve unrelated existing settings on section updates. Map Career stage to `campus.mode` (`campus`, `intern`, or `experienced`), Graduation year to `campus.graduation_year`, and Student status true/false/unknown to `labor.candidate_is_student` true/false/null. Set `salary.min_daily` in **元/天** for internship expectations, separately from full-time `salary.min_monthly_k` and `min_months`; do not convert daily pay to monthly. Keep name, contacts, credentials and birth date out of this config. This flag does not infer student status from the JD; explicit false takes precedence for contract hints.
+
+Round 5 opt-ins: follow [第五轮产品决策](../../docs/cn/第五轮产品决策.md). Do not enable new comparisons merely because Availability text exists. Only when the user wants these reminders, copy confirmed internship availability to `availability.days_per_week` (integer 1–7), `availability.duration_months` (positive months), `availability.start_date` (`YYYY-MM-DD`). Each defaults to null; mismatches only flag, never deduct points or reject. Unknown dates stay null; never invent a year. For a separate annual-package reminder, `salary.min_annual_total_k` is positive **千元/年**, default null, only explicit annual totals, mismatch only flag. `salary.compare_annual_as_monthly` defaults true (legacy annual /12 vs monthly floor); set false only at the user's explicit choice to stop that comparison. It does not disable `min_months`, daily or actual monthly salary checks. Never infer guaranteed bonuses from pay-month counts.
+
+`employer.detect_self_description` defaults false; true displays explicit JD self-description with evidence, unverified and info-only, never scored or filtered. `jargon.flexible_work_overtime_only` defaults false (legacy 6-point deduction); true restricts the flexible-work deduction to the same sentence's non-negated overtime wording. 965 is info-only, with no bonus or risk offset. Keep absent keys absent or at these defaults unless the user opts in; never overwrite an existing choice during section updates. Do not put employer preferences or inferred candidate eligibility into these fields.
 
 ### 9. Generate `.claude/skills/job-scraper/search-queries.md`
-Replace all placeholder tokens in the search queries file with the user's actual information from Section 9 (or the equivalent follow-up questions in Path A's Step A7):
+For the Chinese path, skip query generation and keep portals disabled; the next action is pasting a JD to `/apply`. For the English/international path, replace all placeholder tokens in the search queries file with the user's actual information from Section 9 (or the equivalent follow-up questions in Path A's Step A7):
 - Replace `[YOUR_PRIMARY_ROLE_TYPE]`, `[YOUR_PRIMARY_JOB_TITLE]`, etc. with actual role titles
 - Replace `[YOUR_KEY_SKILL]`, `[YOUR_DOMAIN_KEYWORD_1]`, etc. with actual skills and domain terms
 - Replace `[YOUR_CITY]`, `[YOUR_COUNTRY]`, `[YOUR_REGION]` with actual location
@@ -399,7 +427,16 @@ Replace all placeholder tokens in the search queries file with the user's actual
 
 ## Step 4: Confirm & Next Steps
 
-Present a summary:
+Present a summary in the Step 0 conversation language. For Chinese users, replace the English Try it out block below with:
+
+> 设置完成。CV language: [已选语言，默认中文]；Career stage: [已确认阶段]；模板：[选中的 templates/cn/ 路径或已激活自定义模板]。
+> 中文使用说明见 `docs/cn/`；校招/实习面试见 `docs/cn/校招实习面试准备.md`。
+> 下一步：`/apply` 后手工粘贴完整 JD。生成的是待审阅草稿，用户自己发送；不自动打招呼或投递。
+> 有面试后运行 `/interview <公司>`，以后可用 `/setup --section search` 更新偏好。
+
+Do not show `/scrape`, a Danish URL or portal installation as the next step on this Chinese path. List only the files actually updated; retain the privacy note in Chinese.
+
+English/international summary:
 
 > **Setup complete!** Here's what was generated:
 >
@@ -438,4 +475,4 @@ If Path A left any STAR stubs in `07-interview-prep.md`, also note:
 - Synthesize answers into structured formats (the user does not need to know markdown or LaTeX).
 - Can be re-run with `--section <name>` to update specific sections (e.g., `/setup --section search` to reconfigure job search queries without re-doing the full profile).
 - Section 9 (search) in Path C, and the equivalent follow-up questions in Path A, proactively suggest role types the user may not have considered.
-- At the end, suggest running `/scrape` and `/apply` with a test job posting.
+- At the end, use the language-specific Step 4 next steps: Chinese users paste a JD to `/apply`; English/international users retain the optional `/scrape` workflow.

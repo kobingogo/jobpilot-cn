@@ -87,6 +87,11 @@ ALLOWED_PERMISSIONS = {
     # Reads a file or stdin, writes only to an explicit --out, never fetches.
     "Bash(python tools/posting_guard.py:*)",
     "Bash(python3 tools/posting_guard.py:*)",
+    # Local JD screen (/rank scorers, /apply Step 1). Reads a file or stdin,
+    # writes nothing, never fetches. Hard-filter fail and scam flags block the
+    # fit score; jargon penalties lower it.
+    "Bash(python tools/cn_jd_check.py:*)",
+    "Bash(python3 tools/cn_jd_check.py:*)",
 }
 
 # Rules that must stay in .claude/settings.json permissions.ask. An ask rule
@@ -185,11 +190,22 @@ REQUIRED_IGNORE_RULES = [
     # fetching service, and that skill reads an API token from the environment.
     ".env",
     ".env.*",
+    # jobpilot-cn: local candidate profile and credential files. .env.example
+    # is a secret-free tracked comment (model switching is docs/cn/模型配置.md
+    # and gitignored .claude/settings.local.json, not .env) and is re-included
+    # via ALLOWED_IGNORE_NEGATIONS.
+    "profile/",
+    # Local cn_jd_check thresholds. The tracked file is cn_filters.example.json;
+    # this copy can name cities, age, and a pay floor.
+    "config/cn_filters.json",
+    "*.token",
     # Company research cache (/apply Step 3, /interview Step 2). Referenced
     # from commands, not a skill, so a plain rooted rule is correct here -
     # unlike the **/-prefixed job_scraper/upskill rules above.
     "company_research/*.json",
-    # Machine-local Claude Code user configuration and ad-hoc permissions approvals.
+    # Machine-local Claude Code user configuration, ad-hoc permission approvals,
+    # and provider env (plaintext key). The tracked placeholder is
+    # .claude/settings.local.example.json; do not broaden this rule to ignore it.
     ".claude/settings.local.json",
 ]
 
@@ -205,6 +221,8 @@ ALLOWED_IGNORE_NEGATIONS = {
     "!cv/main_example.tex",
     "!cover_letters/cover_example.tex",
     "!documents/**/.gitkeep",
+    # Tracks the secret-free template; .env and every other .env.* stay ignored.
+    "!.env.example",
 }
 
 # Hook commands the template legitimately ships, as "<Event>:<command>" strings.

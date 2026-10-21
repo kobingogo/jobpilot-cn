@@ -44,6 +44,46 @@ def _sections(text: str) -> dict[str, str]:
 
 
 class RankCommandSpec(unittest.TestCase):
+    def test_cn_jd_check_feeds_rank_and_apply_scores(self):
+        """Cleaned text goes through cn_jd_check. Hard-filter and scam flags block;
+        jargon penalties lower the score. The scorer can actually run the script."""
+        text = COMMAND.read_text(encoding="utf-8")
+        sections = _sections(text)
+        step2 = sections["Step 2: Batch-Fetch and Score"]
+        self.assertIn("cn_jd_check.py", step2)
+        for field in ("hard_fail", "scam_fail", "jargon_penalty", "scam_penalty"):
+            self.assertIn(f'"{field}"', step2)
+        step3 = sections["Step 3: Aggregate and Rank"]
+        self.assertIn("jargon_penalty", step3)
+        self.assertIn("hard_fail", step3)
+        self.assertIn("scam_fail", step3)
+        agent = (REPO / ".claude" / "agents" / "posting-scorer.md").read_text(encoding="utf-8")
+        self.assertIn("cn_jd_check.py", agent)
+        self.assertIn("does not fetch", agent)
+        # Default path reads the user's cn_filters.json. Example thresholds do
+        # not veto. A hard fail still returns the four dimension scores.
+        for label, spec in (("rank step 2", step2), ("posting-scorer", agent)):
+            self.assertIn("config/cn_filters.json", spec, label)
+            self.assertIn("Do not pass `--config`", spec, label)
+            self.assertIn("When `thresholds_source` is `example`, do not veto", spec, label)
+            self.assertIn(
+                "still fill all four scores (`technical`, `experience`, `behavioral`, `career`)",
+                spec,
+                label,
+            )
+            self.assertNotIn("Default config only", spec, label)
+        self.assertIn("When `thresholds_source` is `example`, do not veto", step3)
+        self.assertIn("`technical`, `experience`, `behavioral`, `career`", step3)
+        apply = (REPO / ".claude" / "commands" / "apply.md").read_text(encoding="utf-8")
+        step1 = re.search(r"## Step 1: DRAFTER - Evaluate Fit(.*?)(?=## Step 2:)", apply, re.DOTALL).group(1)
+        self.assertIn("cn_jd_check.py", step1)
+        self.assertIn("jargon_penalty", step1)
+        self.assertIn("hard_fail", step1)
+        self.assertIn("scam_fail", step1)
+        settings = json.loads((REPO / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        for entry in ("Bash(python tools/cn_jd_check.py:*)", "Bash(python3 tools/cn_jd_check.py:*)"):
+            self.assertIn(entry, settings["permissions"]["allow"])
+
     def test_step2_dispatches_posting_scorer_and_returns_guard(self):
         """Scoring agents read untrusted postings, so they run as the shipped
         least-privilege `posting-scorer` definition (no Edit/Write), gate every
@@ -639,7 +679,14 @@ class RankStateToolSpec(unittest.TestCase):
         # experience, behavioral, career) that Step 4 turns into rank_score /
         # rank_verdict, not persisted verbatim; "language" is informational
         # only, per 04-job-evaluation.md's Language Gate section.
-        not_persisted_verbatim = {"key", "status", "language", "scores", "technical", "experience", "behavioral", "career"}
+        # thresholds_source is read from the agent JSON in Step 3 (example does
+        # not veto). The checker already folds that into hard_fail, which is
+        # what apply stores.
+        not_persisted_verbatim = {
+            "key", "status", "language", "scores",
+            "technical", "experience", "behavioral", "career",
+            "thresholds_source",
+        }
         must_persist = set(self._step2_result_fields()) - not_persisted_verbatim
         missing = [f for f in must_persist if f'"{f}"' not in step4]
         self.assertFalse(missing, f"Step 4 does not mention persisting: {missing}")

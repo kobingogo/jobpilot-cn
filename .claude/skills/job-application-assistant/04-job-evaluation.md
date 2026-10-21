@@ -65,6 +65,8 @@ How well do the required/preferred skills align with the candidate's capabilitie
 **Weak match areas:** [SKILLS_YOU_LACK]
 
 ### 2. Experience Match (0-100)
+For `Career stage: campus / intern` (校招/实习), assess relevant projects, coursework, internships, competitions and campus contributions against the JD. No full-time employment alone is not a low experience score. Judge personal contribution, depth and validation; never count projects as paid employment years. Explicit JD eligibility (student status, cohort, availability) is checked separately; unknown facts are questions, not assumed matches. For experienced roles, keep the work-history rubric below.
+
 Does work history align with what they're looking for? Match on the function and nature of the work performed, not the literal job title - a "Data Consultant" and a "Data Scientist" role can be functionally identical.
 
 | Score | Meaning |
