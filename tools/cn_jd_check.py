@@ -335,7 +335,7 @@ _SHORT_PAY = re.compile(
     r"(?:[-~到至]\s*(?P<high>\d+(?:\.\d+)?)\s*)?元"
     r"(?:\s*[/／]\s*(?P<period>天|日|小时|时))?"
 )
-_STUDENT = re.compile(r"在校(?:大学)?生|在(?:校|读)(?:学生|本科|硕士|博士|大学生|研究生)")
+_STUDENT = re.compile(r"在校(?:大学)?生|在(?:校|读)(?:学生|本科|硕士|博士|大学生|研究生)|(?:本科|硕士|博士|研究生)在读")
 _COHORT = re.compile(
     r"(?<!\d)(?P<first>20\d{2}|\d{2})\s*届?\s*"
     r"(?:[-~至到/、]\s*(?P<last>20\d{2}|\d{2})\s*)?届"
@@ -510,6 +510,14 @@ _CITY_GROUPS = {"北上广深": ("北京", "上海", "广州", "深圳"),
                 "北上深广": ("北京", "上海", "深圳", "广州"),
                 "北上": ("北京", "上海")}
 _CITY_ALIASES = {"京": "北京", "沪": "上海", "穗": "广州", "深": "深圳"}
+# Explicit city+district pairs only. A district by itself is never a city hint.
+_CITY_DISTRICTS = {
+    "上海": ("浦东", "黄浦", "徐汇", "长宁", "静安", "普陀", "虹口", "杨浦", "闵行", "宝山", "嘉定", "松江", "青浦", "奉贤", "金山", "崇明"),
+    "杭州": ("余杭", "西湖", "上城", "拱墅", "滨江", "萧山", "临平", "钱塘", "富阳", "临安"),
+    "北京": ("海淀", "朝阳", "东城", "西城", "丰台", "石景山", "通州", "顺义", "昌平", "大兴", "房山", "门头沟", "怀柔", "平谷", "密云", "延庆"),
+    "深圳": ("南山", "福田", "罗湖", "宝安", "龙岗", "龙华", "盐田", "坪山", "光明"),
+    "广州": ("天河", "越秀", "海珠", "荔湾", "白云", "黄埔", "番禺", "花都", "南沙", "增城", "从化"),
+}
 
 
 def _norm_city(name: str) -> str:
@@ -517,6 +525,9 @@ def _norm_city(name: str) -> str:
     mapped = _EN_CITIES.get(name.lower()) or _CITY_ALIASES.get(name)
     if mapped:
         return mapped
+    for city, districts in _CITY_DISTRICTS.items():
+        if re.fullmatch(re.escape(city) + r"市?(?:" + "|".join(districts) + r")", name):
+            return city
     # Only qualified administrative forms; don't infer a city from a district
     # alone (e.g. 朝阳区 exists in more than one city).
     for city in sorted(BUILTIN_CITIES - {"远程", "全国", "不限"}, key=len, reverse=True):
@@ -762,6 +773,12 @@ def parse_cities(text: str, known: set) -> list:
         head = text[:120]
         for match in _HEAD_CITY.finditer(head):
             found.extend(_city_tokens(match.group(1), known))
+        # Compact headers often use pipes: 公司 | 岗位 | 上海浦东 | 薪资.
+        # Require a whole field to normalize to a known city; no prose scan.
+        for field in re.split(r"[|\n]", head):
+            norm = _norm_city(field.strip())
+            if norm in known:
+                found.append(norm)
     if _REMOTE.search(text) and "远程" not in found:
         found.append("远程")
     if _OPEN_LOCATION.search(text) and "不限" not in found:
