@@ -9,15 +9,19 @@
 | 文件 | 作用 |
 |---|---|
 | `cnfonts.sty` | CV 与中文求职信共享字体选择（不改变求职信版式） |
-| `cncover.sty` | 中文求职信显式 A4，保留 cover.cls 页边距与拉丁字体 |
+| `cncover.sty` | 中文求职信 A4；ctexart 提供信头/落款，旧 cover.cls 保留其页边距和字体 |
 | `cnresume.sty` | 版式。单栏，方便 ATS 按阅读顺序抽取文本 |
 | `resume.tex` | 骨架。方括号是占位符，复制后再填 |
 | `example.tex` | 虚构的填好示例，页眉和正文都标了「虚构」 |
+| `cover_example.tex` | ctexart + cnfonts + cncover 的一页虚构求职信示例 |
 | `outreach.md` | Boss直聘 打招呼（2 到 3 句）和智联/猎聘申请附言。用户复制后自己发送 |
 
 照片**默认关闭**。需要时在导言区写 `\cnphoto{photo.jpg}`，图片跟源文件放在一起。不要提交图片（仓库忽略 `*.jpg` / `*.png`）。没打开开关就不会去找图片。
 
-第五轮保留当前字体：中文简历拉丁正文沿用 ctexart 的衬线字体，中文求职信正文与列表保留 Raleway 无衬线。中文字体继续走共享回退。中文求职信在 ctex、cnfonts 后加载 `\usepackage{../templates/cn/cncover}`，显式 A4；不要把 cnresume 的简历页边距带入求职信。完整导言区见 [求职信规范](../../.claude/skills/job-application-assistant/06-cover-letter-templates.md#chinese-cover-letters-中文求职信)，理由见 [第五轮决策](../../docs/cn/第五轮产品决策.md)。现有已生成文件须手工添加该包才会改变纸张；不批量改历史稿件。
+中文本地 Skill 的求职信采用 ctexart + cnfonts + cncover，共享字体回退，正文与列表使用同一字体。
+`\cnletterhead{姓名}{联系方式}{日期}` 提供信头，`\cnlettersignoff{姓名}` 提供落款。
+A4，20mm 页边距，一页；未知联系方式省略，问题另记 review.md，不写入最终材料。
+旧 Claude adapter 的 cover.cls/Raleway 字体说明仅用于它自己的历史流程，保持原样。
 
 ## 编译
 
@@ -31,51 +35,48 @@
 rm -f example.pdf && mkdir -p build && xelatex -interaction=nonstopmode -halt-on-error -output-directory=build example.tex && mv build/example.pdf ./
 ```
 
-`/apply` 把 `resume.tex` 复制到 `cv/main_<company>_<role>.tex` 后，在仓库根目录的 `cv/` 里编译，并用 `TEXINPUTS` 找到样式文件：
+## 中文本地 Skill 输出（默认）
+
+`skills/jobpilot-cn/steps/apply.md` 使用 `tools/jobpilot.py scaffold-application`，
+从确认档案填入简历与信头。工作区 `documents/applications/<company>_<role>/` 中的源稿直接编译，
+以 application.json 的实际 paths 为准，不额外复制到 cv/ 或 cover_letters/。
+所有 Python 示例使用 Python 3.10+ 的 `python3`；若只有 `python`，确认版本后替换；Windows 用 `py -3`。
+
+```bash
+python3 tools/jobpilot.py compile documents/applications/<company>_<role>/cv_draft.tex --contains "姓名"
+python3 tools/jobpilot.py compile documents/applications/<company>_<role>/cover_letter.tex --contains "姓名"
+```
+
+隔离工作区时传该工作区的实际文件路径。CLI 自动设置 TEXINPUTS、Windows 分隔符及临时构建目录，
+使用 -no-shell-escape，检查一页、中文抽取、缺字及源文件/PDF 占位内容。
+含待确认、[占位]、TODO 等则失败；仅预览可加 --draft，最终必须去掉占位并不带该参数编译。
+未知项写到独立 review.md/notes.md。两个 PDF 还需查看版面，不以机械检查替代视觉检查。
+
+在仓库根目录可检查虚构求职信示例（勿用于真实申请）：
+
+```bash
+python3 tools/jobpilot.py compile templates/cn/cover_example.tex --contains "林示意"
+```
+
+照片默认关闭；校园模板是 [campus/resume.tex](campus/resume.tex)，教育优先，无需现职雇主。
+内容不足时保留真实留白，不为填页编造经历；超过一页按岗位相关度删减，
+不缩到五号字或 12mm 页边距以下。日期用 ASCII 连字符（2022.04-2026.03），百分号写 \%，条目间不插 \vspace。
+`tools/verify_layout.py` 的 90pt 页脚带按 moderncv 标定，中文简历可能误报，应结合 PDF 判断。
+打招呼和申请附言参考 outreach.md，只起草，用户自行发送，不抓取或自动投递。
+
+## 旧 Claude adapter 的兼容编译（不用于中文本地 Skill）
+
+`.claude/commands/apply.md` 的上游流程仍使用 cv/、cover_letters/，求职信仍走 cover.cls。
+该分支的中文信按 `06-cover-letter-templates.md` 加载 ctex、cnfonts、cncover，保留 Raleway 和原页边距。
+仅该旧分支从仓库根目录执行下面的历史 CV 命令：
 
 ```bash
 cd cv && rm -f main_<company>_<role>.pdf && mkdir -p build && TEXINPUTS=.:../templates/cn//: xelatex -interaction=nonstopmode -halt-on-error -output-directory=build main_<company>_<role>.tex && mv build/main_<company>_<role>.pdf ./
 ```
 
-失败时先看 `build/` 里的 log，不要留下过期 PDF。不要加 `-shell-escape`。页数必须是 **1**。日期参数用一个 ASCII 连字符（`2022.04-2026.03`），不要写 `--`。百分号写成 `\%`。条目之间不要插入 `\vspace`。
+Windows 手工编译的 TEXINPUTS 使用分号，如 `.;../templates/cn//;`，末尾分隔符保留系统包路径。
+中文本地 Skill 直接用上面的 compile 命令，无需手工设置。旧稿不批量改写。
 
-## 怎么被 `/apply` 选中
-
-档案里的 CV language 是「中文」（或 `Chinese` / `zh`），并且没有用 `/add-template` 登记别的模板时，`/apply` 用这份骨架，而不是 moderncv 的两页简历。用户当次明确要求一页中文简历时同样使用。已经激活的自定义模板优先。求职信仍走原来的 `cover.cls`，语言跟手贴的职位描述走。
-
-一页能放下的大概是：简介两三行，技能三四行，最近一份工作三条，前一份两条，一个项目两条，教育一行。溢到第二页就删内容，不要把字号降到五号以下，也不要把页边距压到 12mm 以下。校招/实习使用 [campus/resume.tex](campus/resume.tex)（[说明与虚构示例](campus/README.md)），教育优先，无需现职雇主。`Career stage: campus / intern` 由 `/setup` 记录，`/apply` 据此选中，仍为 xelatex、单栏、1 页。
-
-## 打招呼和申请附言
-
-`outreach.md` 是两段可复制的短讯，不是 PDF。Boss直聘的招呼是 2 到 3 句。智联和猎聘共用一段申请附言，至多 4 句。`/apply` 在选用这份简历，或用户点名这些网站时，按档案填好草稿，写到 `documents/applications/<company>_<role>/outreach.md`。用户自己复制发送。这里不抓取招聘网站，也不自动打招呼或投递。文中的林示意是**虚构**，不能当事实来源。
-
-`tools/verify_layout.py` 底部 90pt 是按 moderncv 标定的。这份简历写满一页时，末行会落进那条带，脚本可能报页脚冲突。那不是排版错误，不要为了消掉它去加大下边距或删内容。页数看 `verify_pdf.py --pages 1`，再读 PDF。超过 100pt 的空洞仍然算错误。
-
-
-### 输出位置与终端
-
-上面的 `cd cv && ...` 整行从**仓库根目录**执行，社招与校园模板都一样，不从 `documents/applications/` 执行。若已经在 `cv/`，去掉开头的 `cd cv &&`。归档的 `cv_draft.tex` 是快照；编译原稿仍在 `cv/`。编译结束后回到仓库根目录执行 `/apply` 的 `tools/verify_*.py`，否则会报找不到脚本。`TEXINPUTS` 的 `.` 保留源文件旁资源，`//` 递归搜索模板，末尾分隔符保留 TeX 系统包。
-
-Windows 原生 PowerShell 的路径分隔符是分号，不能直接运行 Bash 的变量赋值。从仓库根目录执行（替换文件名）：
-
-```powershell
-Push-Location cv
-$PreviousTexInputs = $env:TEXINPUTS
-try {
-    $env:TEXINPUTS = '.;../templates/cn//;'
-    Remove-Item main_<company>_<role>.pdf -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Force build | Out-Null
-    xelatex -interaction=nonstopmode -halt-on-error -output-directory=build main_<company>_<role>.tex
-    if ($LASTEXITCODE -ne 0) { throw '编译失败，请查看 build 中的 log；不要使用旧 PDF' }
-    Move-Item build/main_<company>_<role>.pdf . -Force
-} finally {
-    $env:TEXINPUTS = $PreviousTexInputs
-    Pop-Location
-}
-```
-
-中文字体按 Noto CJK → Windows SimSun / Microsoft YaHei → macOS Songti SC / PingFang SC → Fandol 选择。Noto 的 TTC 固定简体索引和语言；系统字体能否正确嵌入仍要检查 PDF 文本。Linux 安装 `fonts-noto-cjk`；Windows/macOS 可用系统字体或安装 Noto 的 SC 字体。每次确认日志没有 `Missing character`，`pdftotext -layout -enc UTF-8` 能抽出姓名及中文栏目，页数恰好一页。系统字体不可用时按 log 中的具体字体名安装，重启终端后再编译。
-
-中文求职信按 `06-cover-letter-templates.md` 加载 ctex 与共享字体；只用 XeLaTeX 并不会自动支持中文。
-
-内容不足时保留真实留白；尤其学生无实习/奖项时，不为消除 moderncv 的末页空白告警编造经历。继续检查页数、遮挡、断行与中间空洞。可在 `\cnheader` 第二参数写已确认的到岗时间、期望城市；未知则不填。
+中文字体按 Noto CJK → Windows SimSun / Microsoft YaHei → macOS Songti SC / PingFang SC → Fandol 选择。
+Linux 可装 fonts-noto-cjk；系统字体能否正确嵌入仍需检查。安装后重开终端并重新编译，
+确认没有 Missing character，pdftotext -layout -enc UTF-8 能抽取姓名与中文栏目，页数恰好一页。

@@ -11,6 +11,6 @@ mkdir -p build
 TEXINPUTS=.:..//: xelatex -interaction=nonstopmode -halt-on-error -output-directory=build example.tex
 ```
 
-`/apply` 先按档案 CV language 选择中文分支，再按 `Career stage: campus` / `intern`（校招/实习）选本骨架；已注册的 `ACTIVE-TEMPLATE` 优先。复制到 `cv/main_<company>_<role>.tex` 后，沿用上级 README 的 `TEXINPUTS=.:../templates/cn//:` 编译命令，从仓库根目录执行，不复制样式文件；Windows PowerShell 用上级说明中的分号分隔符。内容不足时保留真实留白，不编造经历凑版；超过一页先删次要条目。
+`/apply` 先按档案 CV language 选择中文分支，再按 `Career stage: campus` / `intern`（校招/实习）选本骨架；已注册的 `ACTIVE-TEMPLATE` 优先。中文本地 Skill 在工作区 `documents/applications/<company>_<role>/cv_draft.tex` 直接编译，使用上级 README 的 `python3 tools/jobpilot.py compile <实际路径>`（Windows：`py -3`；仅有 `python` 时先确认是 Python 3）；不创建第二套稿。只有旧 Claude adapter 沿用 `cv/main_<company>_<role>.tex` 及上级 README 单列的历史编译命令。内容不足时保留真实留白，不编造经历凑版；超过一页先删次要条目。
 
 JD 手工粘贴。不抓取招聘网站，不自动打招呼或投递。

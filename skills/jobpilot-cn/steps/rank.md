@@ -1,6 +1,12 @@
 <!-- Migrated from .claude/commands/rank.md; legacy state-contract headings retained. -->
 # 多份本地 JD 排序
 
+所有命令从仓库根目录运行，使用 Python 3.10+：示例用 `python3`；若只有 `python`，
+确认其为 Python 3 后替换；Windows 用 `py -3`。
+默认 workspace 是仓库根目录；隔离时支持工作区的命令加 `--workspace <目录>`，
+profile/、config/、documents/、company_research/ 及 job_search_tracker.csv 均相对该工作区，
+不读取仓库所有者的个人资料或追踪表。工具与方法文件仍从仓库读取。
+
 本步骤只接收手工保存的本地 JD，不抓招聘网站、不自动打招呼或投递。
 直接说「把这几份 JD 按我的档案排序」。先读取 profile/candidate.json；已有档案按需读取
 `.claude/skills/job-application-assistant/01-candidate-profile.md` 和 `04-job-evaluation.md`。
@@ -8,7 +14,7 @@
 
 ## 本地入口（默认）
 
-1. 对每份正文运行 `python tools/jobpilot.py check-jd --in jd.txt`，按完整性提醒展示证据。
+1. 对每份正文运行 `python3 tools/jobpilot.py check-jd --in jd.txt`，按完整性提醒展示证据。
 2. 根据实际档案对 technical、experience、behavioral、career 各打 0–100 分，逐项写依据、
    优势和缺口。校招/实习看课程、项目、实习，不凭没有全职雇主扣分。
 3. 写 UTF-8 results.json 数组；jd_file 相对 results.json 所在目录解析：
@@ -29,7 +35,7 @@
 ]
 ```
 
-4. 执行 `python tools/jobpilot.py rank --results results.json`。复用 rank_state 的四维权重与
+4. 执行 `python3 tools/jobpilot.py rank --results results.json`。复用 rank_state 的四维权重与
    分档，重新检查本地 JD 并扣三项 penalty；hard_fail / scam_fail / location FAIL /
    language FAIL 单列排除，不因分高放行。未知门槛 FLAG；示例阈值不产生硬拒绝。
    检查器风险分不是匹配分。只读结果，不写追踪表或采集状态。
@@ -37,7 +43,10 @@
 
 ## 已有离线状态兼容（仅用户明确要求更新历史状态时）
 
-以下保留 tools/rank_state.py 的状态契约以兼容原有工作区。所有正文仍必须由用户本地提供；
+以下保留 tools/rank_state.py 的状态契约以兼容原有工作区。
+隔离目录中的历史状态操作须显式使用 rank_state.py 的 --state 路径参数，
+candidates 还须加 --tracker 指向该工作区的追踪表，不使用仓库默认文件；
+先查看相应子命令 --help，或从该工作区运行并用绝对路径调用工具。所有正文仍必须由用户本地提供；
 缺少正文标 unscored 并要求补齐，不为缺文件模拟网络失败或累加 fetch_attempts。
 它不替代上面的本地入口。以下 fetch/unreachable 字段只用于解释历史数据。
 
