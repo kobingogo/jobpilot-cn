@@ -773,9 +773,9 @@ def parse_cities(text: str, known: set) -> list:
         head = text[:120]
         for match in _HEAD_CITY.finditer(head):
             found.extend(_city_tokens(match.group(1), known))
-        # Compact headers often use pipes: 公司 | 岗位 | 上海浦东 | 薪资.
+        # App headers use pipes (including ｜/丨), dots, slashes or commas.
         # Require a whole field to normalize to a known city; no prose scan.
-        for field in re.split(r"[|\n]", head):
+        for field in re.split(r"[|｜丨·/，\n]", head):
             norm = _norm_city(field.strip())
             if norm in known:
                 found.append(norm)

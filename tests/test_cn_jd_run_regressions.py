@@ -9,6 +9,27 @@ def row(report, name):
 
 
 class CompactJdRequirements(unittest.TestCase):
+    def test_city_in_app_headers_with_compact_separators(self):
+        for separator in ('｜', '|', '·', '/', '丨', '，'):
+            for delimiter in (separator, ' ' + separator + ' '):
+                for fields, city in (
+                    (('后端实习', '杭州余杭', '200元/天'), '杭州'),
+                    (('虚构星舟科技', '高级后端工程师', '上海浦东', '25-35K·14薪'), '上海'),
+                ):
+                    jd = delimiter.join(fields)
+                    with self.subTest(jd=jd):
+                        self.assertEqual(checker.parse_cities(jd, checker.BUILTIN_CITIES), [city])
+                        report = checker.check_jd(jd, {'city': {'accept': [city]}})
+                        self.assertEqual(report['parsed']['cities'], [city])
+                        self.assertEqual(row(report, 'city')['status'], 'pass')
+
+    def test_app_header_separators_do_not_turn_prose_or_districts_into_cities(self):
+        for separator in ('｜', '|', '·', '/', '丨', '，'):
+            for place in ('余杭', '浦东', '上海未知片区名', '北京大学', '杭州项目经验'):
+                jd = separator.join(('虚构公司', place, '后端实习', '200元/天'))
+                with self.subTest(jd=jd):
+                    self.assertEqual(checker.parse_cities(jd, checker.BUILTIN_CITIES), [])
+
     def test_city_district_with_or_without_administrative_suffixes(self):
         for city, district in [('上海', '浦东'), ('杭州', '余杭'), ('北京', '海淀'),
                                ('深圳', '南山'), ('广州', '天河')]:
