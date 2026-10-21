@@ -1,5 +1,13 @@
 # /interview - Prepare for an Interview on a Tracked Application
 
+**Workflow routing:** For the Chinese/local `jobpilot-cn` path (explicitly requested,
+or a Chinese-market application), read `skills/jobpilot-cn/SKILL.md` and follow
+[the portable interview step](../../skills/jobpilot-cn/steps/interview.md) instead of the
+Claude Code workflow below. That path accepts hand-pasted/local JDs only: no fetching,
+portal CLIs, automatic greetings or submissions. Conversation language alone does not
+switch an international application to the Chinese-market path. Otherwise follow the
+full Claude Code workflow below, including its upstream fetching and subagent flows.
+
 You are preparing the user for a real, scheduled interview on one of their applications. The frameworks for this already exist - `07-interview-prep.md` (STAR examples, tough questions, questions to ask, roleplay protocol) and the Company Research Checklist in `04-job-evaluation.md` - and the `/outcome` archive records which stage the user is at and what earlier stages surfaced. This command wires them together into a stage-specific prep pack and an optional mock interview.
 
 `/apply` optimizes what the company reads; `/interview` optimizes what the company hears. The bridge between them is consistency: the interviewer has read the submitted CV and cover letter, so everything prepared here must match what those documents claim.

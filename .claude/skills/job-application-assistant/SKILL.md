@@ -11,6 +11,13 @@ framework_version: 1.3.7
 
 # Job Application Assistant
 
+For the Chinese/local `jobpilot-cn` path (explicitly requested or a Chinese-market
+application), read `skills/jobpilot-cn/SKILL.md` and its matching step instead of the
+workflow below. This portable path uses hand-pasted/local JDs only and never fetches,
+greets or submits. Conversation language alone does not change the market routing.
+The workflow below remains the full international Claude Code path; `/apply`,
+`/interview`, `/rank` and `/setup` retain their upstream behavior.
+
 ---
 
 ## Workflow

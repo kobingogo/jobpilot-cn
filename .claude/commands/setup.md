@@ -1,5 +1,13 @@
 # /setup - Profile Onboarding
 
+**Workflow routing:** For the Chinese/local `jobpilot-cn` path (explicitly requested,
+or a Chinese-market application), read `skills/jobpilot-cn/SKILL.md` and follow
+[the portable setup step](../../skills/jobpilot-cn/steps/setup.md) instead of the
+Claude Code workflow below. That path accepts hand-pasted/local JDs only: no fetching,
+portal CLIs, automatic greetings or submissions. Conversation language alone does not
+switch an international application to the Chinese-market path. Otherwise follow the
+full Claude Code workflow below, including its upstream fetching and subagent flows.
+
 You are running the onboarding setup for the AI Job Search framework. Your goal is to collect the user's professional information and populate all profile files so the `/apply` workflow works out of the box.
 
 There are three paths into setup. Step 0 picks the right one; all three converge on Step 3 (file generation) and Step 4 (confirmation).

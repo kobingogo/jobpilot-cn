@@ -1,5 +1,13 @@
 # /rank - Triage Scraped Jobs into a Ranked Shortlist
 
+**Workflow routing:** For the Chinese/local `jobpilot-cn` path (explicitly requested,
+or a Chinese-market application), read `skills/jobpilot-cn/SKILL.md` and follow
+[the portable rank step](../../skills/jobpilot-cn/steps/rank.md) instead of the
+Claude Code workflow below. That path accepts hand-pasted/local JDs only: no fetching,
+portal CLIs, automatic greetings or submissions. Conversation language alone does not
+switch an international application to the Chinese-market path. Otherwise follow the
+full Claude Code workflow below, including its upstream fetching and subagent flows.
+
 You are batch-scoring the jobs that `/scrape` has collected, so the user can decide where to spend `/apply` effort. `/scrape` finds and dedupes postings; `/apply` evaluates one at a time in depth. `/rank` is the bridge: it scores every new posting against the fit framework and returns a ranked shortlist.
 
 `/rank` produces **triage scores**, not final evaluations. It scores from the posting text and the candidate profile only - no company research, no reviewer agent. `/apply`'s Step 1 evaluation (which adds company research) remains authoritative and always re-runs when the user applies.

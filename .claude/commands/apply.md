@@ -1,5 +1,13 @@
 # /apply - Drafter-Reviewer Job Application Workflow
 
+**Workflow routing:** For the Chinese/local `jobpilot-cn` path (explicitly requested,
+or a Chinese-market application), read `skills/jobpilot-cn/SKILL.md` and follow
+[the portable apply step](../../skills/jobpilot-cn/steps/apply.md) instead of the
+Claude Code workflow below. That path accepts hand-pasted/local JDs only: no fetching,
+portal CLIs, automatic greetings or submissions. Conversation language alone does not
+switch an international application to the Chinese-market path. Otherwise follow the
+full Claude Code workflow below, including its upstream fetching and subagent flows.
+
 You are orchestrating a two-agent job application workflow. The job posting is provided below as `$ARGUMENTS` (either a URL or pasted text).
 
 **Language:** follow the user's conversation language for every prompt, assessment, critique summary and final report. For Chinese users, use Chinese headings and actionable Chinese explanations; preserve JSON field names, code identifiers and exact posting keywords. Pass this language to the reviewer. Translate the fixed English messages below before showing them.
