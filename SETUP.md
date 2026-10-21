@@ -4,12 +4,21 @@ Step-by-step instructions for getting the AI Job Search framework running.
 
 ## 中文路径
 
-中文用户先按 [README 中文快速开始](README.md#中文快速开始) 克隆 `kobingogo/jobpilot-cn`，保留中文内容；本指南下面的英文/国际流程仍可使用。安装 Claude Code、Python 3.10+，以及 XeLaTeX、ctex、中文字体即可走手贴 JD 路径，不需要安装 Bun 或招聘门户 CLI。
+核心入口已迁到 [skills/jobpilot-cn/SKILL.md](skills/jobpilot-cn/SKILL.md)，完整操作见
+[安装与使用（各平台）](docs/cn/安装与使用（各平台）.md)。在仓库根目录打开任意本地 Agent，
+告诉它读取该文件即可；不需要 Claude Code、子代理或 `.claude/settings.json`。
+模型由宿主配置，Claude 的 settings.local.json 只是一个可选适配方式。
+新资料用 `python3 tools/jobpilot.py init` 和 `setup-profile write` 写入被忽略的
+`profile/candidate.json`，手贴 JD 用 `check-jd --in jd.txt`。
+下文 `/setup` 等是 Claude 兼容入口，其他宿主直接说「按 Skill 帮我建档/起草/准备面试」。
+
+
+中文用户先按 [README 中文快速开始](README.md#中文快速开始) 克隆 `kobingogo/jobpilot-cn`，保留中文内容；本指南下面的英文/国际流程仍可使用。选择任意支持 shell 与文件读写的本地 Agent，安装 Python 3.10+，以及导出 PDF 所需 XeLaTeX、ctex、中文字体和 Poppler 即可走手贴 JD 路径，不需要安装 Bun 或招聘门户 CLI。
 
 Debian/Ubuntu：
 
 ```bash
-sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-latex-recommended fonts-noto-cjk
+sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-latex-recommended fonts-noto-cjk poppler-utils
 ```
 
 macOS/Windows 在 TeX Live / MacTeX / MiKTeX 中安装 ctex、xeCJK；优先 Noto CJK SC，亦支持 Windows SimSun / Microsoft YaHei 和 macOS Songti SC / PingFang SC。中文简历使用 **xelatex**，不要照下面英文 moderncv 的 lualatex 命令编译；具体命令见 [templates/cn/README.md](templates/cn/README.md)。求职信仍使用 cover.cls，所需依赖见下文。
@@ -40,7 +49,7 @@ tlmgr --repository https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tln
 
 Claude Code 安装、登录和模型服务需要相应网络与账户条件；服务可用地区、供应商条款和组织网络策略以各自官方说明为准。软件包镜像只解决依赖下载，不代表模型服务可访问。可先查看 [Claude Code 安装](https://code.claude.com/docs/en/setup) 与 [网络配置](https://code.claude.com/docs/en/network-config)，再按 [中文模型配置](docs/cn/模型配置.md) 配置支持的 Anthropic 兼容端点；该文档包含主模型与子代理映射、密钥类型及 `/status` 核对方法。模型名、套餐权限和端点可能变化，使用前按供应商官方说明核对；不在本仓库填写或打印真实密钥。
 
-没有 `claude` 时，不要在系统终端执行 `/setup`、`/apply`、`/interview`。可让兼容代理读取 `.claude/commands/` 和所引用 skill 做逐步演练，或手工编辑草稿并运行 Python/TeX 命令；这不等于 CLI 命令或模型接入已通过验证。中文流程无需 Bun 或门户安装。
+没有 `claude` 也可完整使用通用 Skill：在仓库根目录告诉宿主读取 `skills/jobpilot-cn/SKILL.md`，由普通对话与 Python CLI 完成流程。不要在系统终端执行 `/setup`、`/apply`、`/interview`。宿主自身的模型接入需独立验证。中文流程无需 Bun 或门户安装。
 
 文本、JSON、`.tex` 文件保存为 **UTF-8**；检查器接受带 BOM 的 UTF-8 JSON（包括 Windows PowerShell 5 的 `-Encoding UTF8` 输出）。Windows PowerShell 从文件读取更稳妥：
 

@@ -14,7 +14,7 @@
 
 [![CI](https://github.com/MadsLorentzen/ai-job-search/actions/workflows/ci.yml/badge.svg)](https://github.com/MadsLorentzen/ai-job-search/actions/workflows/ci.yml)
 
-An AI-powered job application framework built on [Claude Code](https://claude.com/claude-code). Fork it, fill in your profile, and let Claude evaluate job postings, tailor your CV, write cover letters, and prepare you for interviews.
+jobpilot-cn provides a [platform-agnostic local Skill](skills/jobpilot-cn/SKILL.md) for Chinese job applications. Use any agent with shell and file access to evaluate pasted JDs, draft documents and prepare for interviews. The original international Claude Code workflow is retained below.
 
 > Note: This is an independent open-source project and is not affiliated with, endorsed by, sponsored by, or maintained by Anthropic. Anthropic and Claude Code are referenced only to describe the toolchain this workflow uses.
 >
@@ -63,6 +63,8 @@ The framework encodes career guidance best practices, including structured evalu
 
 ## Prerequisites
 
+中文 Skill：Python 3.10+ 与任意本地 Agent 即可；PDF 另需 XeLaTeX/Poppler。以下为历史国际流程依赖，中文用户直接看下一节。
+
 - [Claude Code](https://claude.com/claude-code) (CLI). Claude Code has no free tier: you need a Claude Pro/Max/Team subscription or Anthropic API credits (pay-per-token, usually cheaper for occasional use). Using a different agent tool (Codex, Antigravity, Gemini CLI)? Start at [`AGENTS.md`](AGENTS.md) - the portal search skills work there out of the box, and [community forks](https://github.com/MadsLorentzen/ai-job-search/discussions/78) adapt the full workflow.
 - Python 3.10+
 - [Bun](https://bun.sh) (for job search CLI tools)
@@ -71,25 +73,51 @@ The framework encodes career guidance best practices, including structured evalu
 
 ## 中文快速开始
 
-本地中文路径只接收手工粘贴的 JD，不抓取招聘网站，不自动打招呼或投递。先获取本中文分支：
+现在以 **[jobpilot-cn 通用 Skill](skills/jobpilot-cn/SKILL.md)** 为核心，支持有 shell 和文件读写能力的
+Codex CLI、Cursor、Trae、Grok Build、Gemini CLI/agy、Claude Code 等本地 Agent。
+Skill 使用宿主自己的模型；国产模型在宿主配置，无需 Claude 账户或 `.claude/settings`。
+[安装与使用（各平台）](docs/cn/安装与使用（各平台）.md) 给出入口、中文提示及未核实路径的兜底办法。
+
+只接收手工粘贴的 JD，不抓取招聘网站，不自动打招呼或投递。先获取本中文分支：
 
 ```bash
 git clone https://github.com/kobingogo/jobpilot-cn.git
 cd jobpilot-cn
-# Debian/Ubuntu；其他系统见 SETUP.md
-sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra fonts-noto-cjk
-claude
+python3 tools/jobpilot.py init
+# 需要导出 PDF 时安装；Windows/macOS 见 SETUP.md
+sudo apt install texlive-xetex texlive-lang-chinese texlive-latex-extra fonts-noto-cjk poppler-utils
 ```
 
-依赖下载、Windows UTF-8、TeX Live 镜像及模型服务网络说明见 [SETUP 中文路径](SETUP.md#中文路径)。没有 `claude` 时可按其中说明做手工演练，斜杠命令不能直接在系统终端运行。
+Windows 将 `python3` 换成 `py`。在任意 Agent 中打开仓库根目录，说：
 
-在会话里输入 `/setup 中文`，或直接用中文回答。设置会以中文提问，默认 **CV language: 中文**；选择「社招 / 校招 / 实习」，分别使用 `templates/cn/resume.tex` 或 `templates/cn/campus/resume.tex`，已激活自定义模板优先。英文用户仍走 English / moderncv。
+> 读 skills/jobpilot-cn/SKILL.md，按 setup 步骤用中文帮我建档；未知信息先问我。
 
-准备姓名、城市、教育/经历（项目也算）、目标岗位和可到岗时间；薪资可填区间或暂不确定。校招/实习另确认在读状态、毕业年份、每周可到岗天数和持续月数；GPA/排名、奖项、照片和 LinkedIn 可跳过。`/setup` 会把确认后的筛选设置写入本地 `config/cn_filters.json`，实习日薪使用 `salary.min_daily`（元/天）。
+> 这份 JD 已由我保存为 documents/postings/jd.txt。按 jobpilot-cn 检查并起草申请，审阅后编译一页中文 PDF；我自己投递。
 
-下一步输入 `/apply` 并**手工粘贴完整 JD**，审阅生成的简历与未发送短讯，再自行投递。中文路径无需 Bun 或招聘门户 CLI，丹麦站点演示仅适用于丹麦。面试时用 `/interview <公司>`；参阅 [中文指南](docs/cn/)、[校招/实习模板](templates/cn/campus/README.md)、[校招/实习面试准备](docs/cn/校招实习面试准备.md) 和 [中文安装说明](SETUP.md#中文路径)。
+准备姓名、城市、教育/经历（项目也算）、目标岗位和可到岗时间；选择社招 / 校招 / 实习。
+默认 **CV language: 中文**，社招选 `templates/cn/resume.tex`，校招/实习选
+`templates/cn/campus/resume.tex`，已有激活自定义模板优先。英文档案仍可保留 English。
+在读状态单独确认，不从毕业年份推断；GPA、照片、LinkedIn 和薪资均可暂缺。
+确认后的档案写入本地 `profile/candidate.json`，筛选设置在 `config/cn_filters.json`，均被 git 忽略。
 
-`/setup` 会将个人资料写进受 git 跟踪的档案文件；保留在本地，或使用私有仓库，勿推到公开 fork。远端安排见 [SETUP.md section 8](SETUP.md#8-pulling-upstream-updates-into-your-fork)。不要把密钥填进档案或提交。
+CLI 不连接模型，负责本地确定性步骤：
+
+```bash
+python3 tools/jobpilot.py check-jd --in documents/postings/jd.txt
+python3 tools/jobpilot.py scaffold-application --in documents/postings/jd.txt --company 虚构公司 --role 虚构岗位
+python3 tools/jobpilot.py compile documents/applications/虚构公司_虚构岗位/cv_draft.tex --contains 虚构
+python3 tools/jobpilot.py interview-prep --application documents/applications/虚构公司_虚构岗位 --stage 一面
+```
+
+上面的公司和岗位是**虚构**；骨架仍需宿主 Agent 按步骤完成撰写、审阅。
+使用真实资料前先建档；没有确认档案时 scaffold 会提示先建档。
+有面试后说「按 jobpilot-cn 帮我准备这份申请的技术面」。多份本地 JD 可走 rank 步骤。
+依赖下载、Windows UTF-8 与 TeX 镜像见 [SETUP 中文路径](SETUP.md#中文路径)。
+
+Claude Code 用户仍可用 `/setup 中文`、`/apply` 后手贴 JD、`/interview` 和 `/rank`，
+中文路径转到同一 Skill；国际路径保留原有 URL 获取、门户 CLI 升级链、子代理和公司研究。[中文模型配置](docs/cn/模型配置.md) 仅为 Claude Code 的可选接入说明。
+中文路径无需 Bun 或门户 CLI。生成文件未发送，审阅后自己投递。
+已有 `CLAUDE.md` 等历史档案受 git 跟踪，勿把个人资料推到公开 fork；不填写或提交密钥。
 
 ## Quick start
 
