@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """jobpilot-cn 本地工作流；仅标准库，不连接模型或招聘网站。"""
 import argparse
+from datetime import date
 import json
 import os
 from pathlib import Path
@@ -26,7 +27,7 @@ STAGES = {"experienced": "experienced", "社招": "experienced", "campus": "camp
 class ChineseParser(argparse.ArgumentParser):
     def error(self, message):
         self.print_usage(sys.stderr)
-        self.exit(2, f"参数错误：{message}；请运行 python tools/jobpilot.py --help，或在子命令后加 --help 查看用法。\n")
+        self.exit(2, f"参数错误：{message}；请运行 python3 tools/jobpilot.py --help（Windows：py -3），或在子命令后加 --help 查看用法。\n")
 
 
 def read_text(path):
@@ -187,11 +188,14 @@ def resume(profile, role):
     template = REPO / ("templates/cn/campus/resume.tex" if campus else "templates/cn/resume.tex")
     # Reuse the shipped preamble/style, replacing content with confirmed facts.
     preamble = read_text(template).split(r"\begin{document}", 1)[0]
+    # Skeleton instructions refer to unfilled examples and legacy output paths.
+    # They are not part of the populated application source.
+    preamble = "\n".join(line for line in preamble.splitlines() if not line.lstrip().startswith("%")) + "\n"
     preamble = preamble.replace("pdftitle={姓名}", "pdftitle={" + tex(profile["name"]) + "}")
     preamble = preamble.replace("pdfauthor={姓名}", "pdfauthor={" + tex(profile["name"]) + "}")
     lines = [preamble, r"\begin{document}",
              r"\cnheader{" + tex(profile["name"]) + "}{" + tex(role + " · " + profile["city"])
-             + "}{" + tex(profile.get("phone", "电话待确认") + " · " + profile.get("email", "邮箱待确认")) + "}"]
+             + "}{" + tex(" · ".join(profile[k] for k in ("phone", "email") if profile.get(k))) + "}"]
     if profile.get("availability"):
         lines.append(r"\cnprofile{可到岗时间：" + tex(profile["availability"]) + "}")
     sections = [("education", "教育背景"), ("experience", "实习经历"), ("projects", "项目经历")] if campus else [
@@ -204,8 +208,9 @@ def resume(profile, role):
             lines.extend([r"\cnsection{" + title + "}", r"\begin{itemize}"])
             lines.extend(r"\item " + tex(value) for value in values)
             lines.append(r"\end{itemize}")
-    lines.extend([r"\cnsection{专业技能}", r"\cnprofile{" + tex(profile.get("skills", "待确认")) + "}",
-                  "% 草稿：缺失事实请与本人确认；不得把项目改写成任职。", r"\end{document}"])
+    if profile.get("skills"):
+        lines.extend([r"\cnsection{专业技能}", r"\cnprofile{" + tex(profile["skills"]) + "}"])
+    lines.extend(["% 草稿：缺失事实请与本人确认；不得把项目改写成任职。", r"\end{document}"])
     return "\n".join(lines) + "\n", template.relative_to(REPO).as_posix()
 
 
@@ -221,18 +226,27 @@ def cmd_scaffold(args):
         raise ValueError(f"申请目录已存在：{folder}；保留原始材料，请由 Agent 定点编辑或选择不同岗位名")
     cv, selected = resume(profile, args.role)
     letter = (r"\documentclass[a4paper,fontset=none,zihao=5]{ctexart}" + "\n"
-              r"\usepackage{cnfonts}" + "\n" + r"\usepackage[margin=20mm]{geometry}" + "\n"
-              r"\pagestyle{empty}" + "\n" + r"\begin{document}" + "\n"
+              r"\usepackage{cnfonts}" + "\n" + r"\usepackage{cncover}" + "\n"
+              r"\begin{document}" + "\n"
+              + r"\cnletterhead{" + tex(profile["name"]) + "}{"
+              + tex(" · ".join(profile[k] for k in ("phone", "email", "city") if profile.get(k)))
+              + "}{" + date.today().isoformat() + "}\n\n"
               + tex(args.company + "招聘团队：") + "\n\n"
               + tex("申请" + args.role + "。我是" + profile["name"] + "。") + "\n\n"
               + "待补充：从已确认的档案选一条贡献，对应 JD 的一条要求；没有直接经验的部分如实说明。\n\n"
-              + tex(profile["name"]) + "\n" + r"\end{document}" + "\n")
+              + r"\cnlettersignoff{" + tex(profile["name"]) + "}\n" + r"\end{document}" + "\n")
     folder.mkdir(parents=True)
     paths = {key: str(folder / name) for key, name in {
         "cv": "cv_draft.tex", "cover_letter": "cover_letter.tex", "posting": "job_posting.md",
-        "outreach": "outreach.md", "check": "jd_check.json"}.items()}
+        "outreach": "outreach.md", "check": "jd_check.json", "review": "review.md"}.items()}
     (folder / "cv_draft.tex").write_text(cv, encoding="utf-8")
     (folder / "cover_letter.tex").write_text(letter, encoding="utf-8")
+    missing = [key for key in ("phone", "email", "education", "experience", "projects", "skills")
+               if not profile.get(key)]
+    (folder / "review.md").write_text("# 申请审阅记录\n\n"
+        + "缺失资料（按岗位决定补充或省略）：" + ("、".join(missing) or "无") + "\n\n"
+        + "公司业务、文化等未获用户确认的说法：待确认，仅记录于此，不写入信件。\n"
+        + "请补写信件中的贡献段；正式编译前移除全部占位文字。\n", encoding="utf-8")
     counts = {key: len(value) if isinstance(value, (dict, list)) else value
               for key, value in report["integrity"]["findings"].items()}
     (folder / "job_posting.md").write_text(cleaned + "\n\n## posting_guard\n"
@@ -251,10 +265,27 @@ def cmd_scaffold(args):
     return {**manifest, "directory": str(folder), "message": "已填入已知事实和输出路径；仍需 Agent 按 apply 步骤撰写、审阅及编译"}
 
 
+_PLACEHOLDER = re.compile(
+    r"待\s*确\s*认|待\s*(?:补充|填写|完善)|[\[【]\s*占位[^\]】\n]*[\]】]"
+    r"|(?<![A-Za-z0-9])(?:TODO|FIXME|TBD|XXX|PLACEHOLDER)(?![A-Za-z0-9])"
+    r"|\[\s*(?:YOUR_[A-Z_]+|FIRST_NAME|LAST_NAME|姓名|电话|邮箱|学校|公司|岗位|时间|日期)\s*\]",
+    re.I,
+)
+
+
+def reject_placeholders(text, label):
+    match = _PLACEHOLDER.search(unicodedata.normalize("NFKC", text))
+    if match:
+        raise ValueError(f"{label}含占位内容「{match.group(0)}」；请补充已确认事实或删去该项，"
+                         "将未知信息移到同目录 review.md/notes.md；仅预览草稿时加 --draft，不能作为正式材料")
+
+
 def cmd_compile(args):
     source = args.source.resolve()
     if source.suffix != ".tex" or not source.is_file():
         raise ValueError("compile 需要现有 .tex 文件；请检查路径")
+    if not args.draft:
+        reject_placeholders(read_text(source), "TeX 源文件")
     executable = shutil.which("xelatex")
     if not executable:
         raise ValueError("找不到 xelatex；请安装 TeX Live/MiKTeX、ctex、xeCJK 和中文字体，参阅 SETUP.md 中文路径")
@@ -285,6 +316,8 @@ def cmd_compile(args):
             extracted, pages = _extract_pdftotext(built)
         except VerificationError as exc:
             raise ValueError(f"PDF 抽取工具执行失败，请检查 Poppler 安装：{exc}") from exc
+        if not args.draft:
+            reject_placeholders(extracted, "PDF 文本")
         if pages != args.pages:
             raise ValueError(f"PDF 应为 {args.pages} 页，实际 {pages} 页；请按岗位相关度删减，不缩小到五号字/12mm 以下")
         if not re.search(r"[\u3400-\u9fff]", extracted) or "\ufffd" in extracted or re.search(r"\(cid:\d+\)", extracted):
@@ -294,7 +327,7 @@ def cmd_compile(args):
                 raise ValueError(f"PDF 未抽取到 {needle!r}；检查中文字体及源文件内容")
         pdf = source.with_suffix(".pdf")
         shutil.copyfile(built, pdf)
-    return {"pdf": str(pdf), "pages": pages, "extractor": "pdftotext", "cjk": True,
+    return {"pdf": str(pdf), "pages": pages, "extractor": "pdftotext", "cjk": True, "draft": args.draft,
             "missing_character": False, "message": "机械检查通过；仍需查看 PDF 版面及事实，草稿不等于可投递"}
 
 
@@ -377,6 +410,7 @@ def parser():
     p.add_argument("source", type=Path)
     p.add_argument("--pages", type=int, choices=range(1, 100), default=1)
     p.add_argument("--contains", action="append", default=[], help="必须抽取到的姓名/关键词，可重复")
+    p.add_argument("--draft", action="store_true", help="仅预览：允许占位文字，输出不得作为正式申请材料")
     p.set_defaults(func=cmd_compile)
     p = sub.add_parser("interview-prep", parents=[common])
     p.add_argument("--application", type=Path, required=True)

@@ -164,8 +164,20 @@ class LocalWorkflow(unittest.TestCase):
     def test_compile_actual_scaffold_cjk_and_page_checks(self):
         self.setup_profile()
         app = self.scaffold()
+        letter = Path(app["paths"]["cover_letter"])
+        content = letter.read_text(encoding="utf-8")
+        self.assertIn(r"\usepackage{cncover}", content)
+        self.assertIn(r"\cnletterhead{虚构候选人}", content)
+        self.assertIn(r"\cnlettersignoff{虚构候选人}", content)
+        self.assertNotIn("电话待确认", content)
+        self.assertIn("占位", self.cli("compile", letter, ok=False))
+        # Complete the contribution paragraph from this fictional profile.
+        content = content.replace("待补充：从已确认的档案选一条贡献，对应 JD 的一条要求；没有直接经验的部分如实说明。",
+                                  "在虚构课程项目中，我使用 Python 编写了本地文本工具。")
+        letter.write_text(content, encoding="utf-8")
         for key in ("cv", "cover_letter"):
             report = self.cli("compile", app["paths"][key], "--contains", "虚构候选人")
+            self.assertFalse(report["draft"])
             self.assertEqual(report["pages"], 1)
             self.assertTrue(report["cjk"])
             self.assertFalse(report["missing_character"])
